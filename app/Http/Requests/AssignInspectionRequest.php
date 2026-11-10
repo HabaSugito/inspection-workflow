@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\InspectionWorkflow;
 use Illuminate\Foundation\Http\FormRequest;
 
 class AssignInspectionRequest extends FormRequest
@@ -12,7 +13,7 @@ class AssignInspectionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'inspector_name' => ['required', 'string', 'max:255'],
+            'inspector_name' => ['required', 'string', 'max:'.InspectionWorkflow::INSPECTOR_NAME_MAX],
         ];
     }
 }

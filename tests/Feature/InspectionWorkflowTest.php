@@ -8,6 +8,7 @@ use App\Services\InspectionWorkflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -32,6 +33,22 @@ class InspectionWorkflowTest extends TestCase
             'in_progress' => $factory->inProgress()->create(),
             'completed' => $factory->completed()->create(),
         };
+    }
+
+    private function createOneInspectionInEveryStatus(): void
+    {
+        foreach (array_keys(self::VALID_ACTION) as $status) {
+            $this->inspectionIn($status);
+        }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function everyRowExcept(Inspection $inspection): array
+    {
+        return DB::table('inspections')->where('id', '!=', $inspection->id)->orderBy('id')->get()
+            ->map(fn ($row) => (array) $row)->keyBy('id')->all();
     }
 
     /**
@@ -128,9 +145,12 @@ class InspectionWorkflowTest extends TestCase
     ): void {
         $inspection = $this->inspectionIn($status);
         $before = $this->storedRow($inspection);
+        $this->createOneInspectionInEveryStatus();
+        $neighbours = $this->everyRowExcept($inspection);
 
         $this->travel(1)->hours();
         $response = $this->postJson("/api/inspections/{$inspection->id}/{$action}", ['inspector_name' => 'Someone Else']);
+        $this->assertSame($neighbours, $this->everyRowExcept($inspection));
 
         $response->assertConflict()
             ->assertJsonPath('current_status', $status)
@@ -403,5 +423,88 @@ class InspectionWorkflowTest extends TestCase
         $this->postJson("/api/inspections/{$inspection->id}/start")->assertConflict();
 
         Exceptions::assertNothingReported();
+    }
+
+    #[DataProvider('validSteps')]
+    public function test_ac301_to_ac304_a_step_changes_only_the_inspection_it_was_asked_to_change(string $status, string $action): void
+    {
+        $this->createOneInspectionInEveryStatus();
+        $inspection = $this->inspectionIn($status);
+        $this->inspectionIn($status);
+        $neighbours = $this->everyRowExcept($inspection);
+
+        $this->travel(1)->hours();
+        $this->postJson("/api/inspections/{$inspection->id}/{$action}", ['inspector_name' => 'Sam Carter'])->assertOk();
+
+        $this->assertCount(5, $neighbours);
+        $this->assertSame($neighbours, $this->everyRowExcept($inspection));
+    }
+
+    #[DataProvider('blankNames')]
+    public function test_ac301_the_service_refuses_a_blank_inspector_name_from_any_caller(string $name): void
+    {
+        $inspection = $this->inspectionIn('pending');
+        $before = $this->storedRow($inspection);
+
+        try {
+            app(InspectionWorkflow::class)->assign($inspection, $name);
+            $this->fail('A blank inspector name was accepted.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame($before, $this->storedRow($inspection));
+        }
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function blankNames(): array
+    {
+        return ['empty' => [''], 'spaces only' => ['   ']];
+    }
+
+    public function test_ac301_the_service_refuses_an_inspector_name_over_the_limit_from_any_caller(): void
+    {
+        $inspection = $this->inspectionIn('pending');
+        $before = $this->storedRow($inspection);
+
+        try {
+            app(InspectionWorkflow::class)->assign($inspection, str_repeat('a', 256));
+            $this->fail('A name over the limit was accepted.');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame($before, $this->storedRow($inspection));
+        }
+    }
+
+    public function test_ac306_starting_is_refused_when_the_inspector_name_is_blank(): void
+    {
+        $inspection = Inspection::factory()->assigned()->create(['inspector_name' => '']);
+        $before = $this->storedRow($inspection);
+
+        $this->postJson("/api/inspections/{$inspection->id}/start")
+            ->assertConflict()
+            ->assertJsonPath('allowed_action', null);
+        $this->assertSame($before, $this->storedRow($inspection));
+    }
+
+    public function test_ac306_an_assigned_inspection_with_no_inspector_offers_no_next_action(): void
+    {
+        $inspection = Inspection::factory()->assigned()->create(['inspector_name' => null]);
+
+        $this->getJson("/api/inspections/{$inspection->id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'assigned')
+            ->assertJsonPath('data.next_action', null);
+    }
+
+    public function test_the_step_time_columns_are_removed_when_the_migration_is_rolled_back(): void
+    {
+        $this->assertTrue(Schema::hasColumns('inspections', ['assigned_at', 'started_at', 'completed_at']));
+
+        $this->artisan('migrate:rollback', ['--step' => 1])->assertSuccessful();
+
+        $this->assertFalse(Schema::hasColumn('inspections', 'assigned_at'));
+        $this->assertFalse(Schema::hasColumn('inspections', 'started_at'));
+        $this->assertFalse(Schema::hasColumn('inspections', 'completed_at'));
+        $this->assertTrue(Schema::hasColumn('inspections', 'status'));
     }
 }

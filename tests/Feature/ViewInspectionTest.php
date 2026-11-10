@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Inspection;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -46,17 +48,21 @@ class ViewInspectionTest extends TestCase
     public function test_ac203_an_inspection_can_be_retrieved_by_id(): void
     {
         $this->travelTo('2026-11-10 09:00:00');
-        $other = Inspection::factory()->create();
+        // The wanted inspection is neither the oldest nor the newest, so an
+        // implementation that ignores the ID cannot return it by accident.
+        $older = Inspection::factory()->create();
         $wanted = Inspection::factory()->create([
             'customer_name' => 'Jane Smith',
             'vehicle_registration' => 'AB12 CDE',
             'requested_date' => '2026-12-01',
             'notes' => 'Customer prefers a morning visit.',
         ]);
+        $newer = Inspection::factory()->create();
 
         $response = $this->getJson("/api/inspections/{$wanted->id}");
 
-        $this->assertNotSame($other->id, $wanted->id);
+        $this->assertLessThan($wanted->id, $older->id);
+        $this->assertGreaterThan($wanted->id, $newer->id);
         $response->assertOk()->assertExactJson([
             'data' => [
                 'id' => $wanted->id,
@@ -142,5 +148,26 @@ class ViewInspectionTest extends TestCase
             ->assertNotFound()
             ->assertHeader('Content-Type', 'application/json')
             ->assertJsonStructure(['message']);
+    }
+
+    public function test_ac204_the_fixed_message_is_used_only_for_a_missing_inspection(): void
+    {
+        Route::middleware('api')->get('/api/test-only/users/{user}', fn (User $user) => $user);
+
+        $response = $this->getJson('/api/test-only/users/999999');
+
+        $response->assertNotFound();
+        $this->assertNotSame('Inspection not found.', $response->json('message'));
+    }
+
+    public function test_the_seeder_creates_sample_inspections_in_every_status(): void
+    {
+        $this->seed();
+
+        $this->assertSame(
+            ['assigned' => 2, 'completed' => 1, 'in_progress' => 1, 'pending' => 3],
+            Inspection::query()->toBase()->selectRaw('status, count(*) as total')
+                ->groupBy('status')->orderBy('status')->pluck('total', 'status')->all(),
+        );
     }
 }

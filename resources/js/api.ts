@@ -31,6 +31,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         );
     }
 
+    if (body === null) {
+        throw new ApiError(response.status, 'The server sent a response that could not be read.');
+    }
+
     return body as T;
 }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\Inspection;
+use App\Services\InspectionWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,7 +25,7 @@ class InspectionResource extends JsonResource
             'notes' => $this->notes,
             'status' => $this->status->value,
             'inspector_name' => $this->inspector_name,
-            'next_action' => $this->status->nextAction(),
+            'next_action' => app(InspectionWorkflow::class)->nextAction($this->resource),
             'assigned_at' => $this->assigned_at?->toIso8601ZuluString(),
             'started_at' => $this->started_at?->toIso8601ZuluString(),
             'completed_at' => $this->completed_at?->toIso8601ZuluString(),
