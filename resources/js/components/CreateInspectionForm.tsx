@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { ApiError, createInspection, type FieldErrors } from '../api';
 import type { Inspection, NewInspection } from '../types';
 
@@ -28,9 +28,18 @@ export function CreateInspectionForm({ onCreated, onCancel }: Props) {
     const [submitting, setSubmitting] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
     const [formError, setFormError] = useState<string | null>(null);
+    // `submitting` disables the button only after the next render. Two submit
+    // events in the same tick would both pass it, so this is checked first.
+    const inFlight = useRef(false);
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+
+        if (inFlight.current) {
+            return;
+        }
+
+        inFlight.current = true;
         setSubmitting(true);
         setFieldErrors({});
         setFormError(null);
@@ -49,6 +58,7 @@ export function CreateInspectionForm({ onCreated, onCancel }: Props) {
             }
 
             setSubmitting(false);
+            inFlight.current = false;
         }
     }
 
