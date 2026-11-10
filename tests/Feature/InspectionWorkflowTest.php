@@ -426,7 +426,7 @@ class InspectionWorkflowTest extends TestCase
     }
 
     #[DataProvider('validSteps')]
-    public function test_ac301_to_ac304_a_step_changes_only_the_inspection_it_was_asked_to_change(string $status, string $action): void
+    public function test_ac301_to_ac304_a_step_changes_only_the_inspection_it_was_asked_to_change(string $status, string $action, string $newStatus): void
     {
         $this->createOneInspectionInEveryStatus();
         $inspection = $this->inspectionIn($status);
@@ -434,7 +434,9 @@ class InspectionWorkflowTest extends TestCase
         $neighbours = $this->everyRowExcept($inspection);
 
         $this->travel(1)->hours();
-        $this->postJson("/api/inspections/{$inspection->id}/{$action}", ['inspector_name' => 'Sam Carter'])->assertOk();
+        $this->postJson("/api/inspections/{$inspection->id}/{$action}", ['inspector_name' => 'Sam Carter'])
+            ->assertOk()
+            ->assertJsonPath('data.status', $newStatus);
 
         $this->assertCount(5, $neighbours);
         $this->assertSame($neighbours, $this->everyRowExcept($inspection));
