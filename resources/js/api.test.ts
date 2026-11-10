@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, assignInspector, createInspection, listInspections } from './api';
+import {
+    ApiError,
+    assignInspector,
+    completeInspection,
+    createInspection,
+    listInspections,
+    startInspection,
+} from './api';
 import { inspection } from './test-fixtures';
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -128,4 +135,21 @@ describe('api', () => {
         expect(init?.method).toBe('POST');
         expect(JSON.parse(init?.body as string)).toEqual({ inspector_name: 'Sam Carter' });
     });
+
+    it.each([
+        ['start', () => startInspection(4), '/api/inspections/4/start'],
+        ['complete', () => completeInspection(4), '/api/inspections/4/complete'],
+    ] as const)(
+        'posts the %s step to its own path for the inspection it was given',
+        async (_, call, expected) => {
+            fetchMock.mockResolvedValue(respond(200, { data: inspection({ id: 4 }) }));
+
+            const result = await call();
+
+            const [path, init] = fetchMock.mock.calls[0];
+            expect(path).toBe(expected);
+            expect(init?.method).toBe('POST');
+            expect(result.id).toBe(4);
+        },
+    );
 });

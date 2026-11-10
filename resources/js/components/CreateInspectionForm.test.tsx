@@ -189,6 +189,36 @@ describe('CreateInspectionForm', () => {
         expect(screen.queryByRole('alert')).toBeNull();
     });
 
+    it('UI-405 shows a refusal for an unknown field even when a known field is refused too', async () => {
+        create.mockRejectedValue(
+            new ApiError(422, 'The customer name field is required.', {
+                customer_name: ['The customer name field is required.'],
+                status: ['The status field is prohibited.'],
+            }),
+        );
+        setup();
+
+        await userEvent.click(submitButton());
+
+        expect((await screen.findByRole('alert')).textContent).toBe(
+            'The status field is prohibited.',
+        );
+        expect(screen.getByText('The customer name field is required.')).toBeTruthy();
+    });
+
+    it('UI-402 can be used again after a success, if its parent keeps it open', async () => {
+        create.mockResolvedValue(inspection({ id: 9 }));
+        const { onCreated } = setup();
+
+        await userEvent.click(submitButton());
+        await vi.waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+        await vi.waitFor(() => expect(submitButton().disabled).toBe(false));
+        await userEvent.click(submitButton());
+
+        await vi.waitFor(() => expect(onCreated).toHaveBeenCalledTimes(2));
+        expect(create).toHaveBeenCalledTimes(2);
+    });
+
     it('UI-406 cancels without sending anything', async () => {
         const { onCancel, onCreated } = setup();
 

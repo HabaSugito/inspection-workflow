@@ -4,7 +4,7 @@
 |---|---|
 | Design spec | [DS-004](ds-004.md), decision OQ-404. Covers UI criteria from DS-002, DS-003 and DS-004 |
 | Depends on | [TS-004 create and select](ts-004-create-and-select-ui.md) |
-| Files changed | 13 |
+| Files changed | 14 |
 
 **Aligns to architecture:** [docs/architecture.md](../../docs/architecture.md). One addition: frontend tests live beside the code they test, under `resources/js`. The architecture document is updated to say so.
 
@@ -34,13 +34,14 @@ Not added: `@testing-library/jest-dom`. Its matchers are a convenience, and plai
 | 1 | `package.json` | Modified | The four packages, and a `test` script. `package-lock.json` is generated and not counted |
 | 2 | `vitest.config.ts` | New | The test environment and where the tests are. Uses the React plugin only, not the Laravel plugin |
 | 3 | `resources/js/test-setup.ts` | New | Unmounts rendered components after each test |
-| 4 | `resources/js/components/InspectionsPage.tsx` | New | The page component, moved unchanged from `app.tsx` |
+| 4 | `resources/js/components/InspectionsPage.tsx` | New | The page component, moved from `app.tsx`. Its behaviour is unchanged. Its two panels gained names (see DV-1) |
 | 5 | `resources/js/app.tsx` | Modified | Mounts `InspectionsPage`. Nothing else |
 | 6 | `resources/js/api.test.ts` | New | Section 10 |
 | 7 | `resources/js/components/InspectionList.test.tsx` | New | Section 10 |
 | 8 | `resources/js/components/NextActionControl.test.tsx` | New | Section 10 |
 | 9 | `resources/js/components/CreateInspectionForm.test.tsx` | New | Section 10 |
 | 10 | `resources/js/components/InspectionsPage.test.tsx` | New | Section 10 |
+| 14 | `resources/js/components/InspectionDetail.test.tsx` | New | Section 10. Added after a review (see DV-5) |
 | 11 | `start.sh` | Modified | Runs `npm test` |
 | 12 | `docs/architecture.md` | Modified | Where frontend tests live, and that `start.sh` runs them |
 | 13 | `resources/js/test-fixtures.ts` | New | One function that builds a sample inspection for the tests |
@@ -64,7 +65,7 @@ No change to the application. Each test renders into a fresh DOM, and every repl
 
 ## 7. Flow, navigation & data movement
 
-No change to the application's flow. The page component moves file, and its code does not change.
+No change to the application's flow. The page component moves file. The only change to its code is the two `aria-label`s of DV-1.
 
 ## 8. Validation, invariants & error handling
 
@@ -79,15 +80,16 @@ No change to the application's flow. The page component moves file, and its code
 
 ## 10. Testing strategy
 
-Each test name starts with the ID of the criterion it covers.
+A component test name starts with the ID of the criterion it covers. The tests of `api.ts` have no ID: that layer has no acceptance criterion of its own, and its tests are named for what they check. There are 55 tests in 6 files.
 
 | File | Covers |
 |---|---|
-| `api.test.ts` (8 tests) | A successful list. An error response becomes an `ApiError` with its status and the server's message. A 422 carries its errors per field. A network failure has status 0. A successful response that is not JSON is an `ApiError`. `createInspection` and `assignInspector` send `POST` with a JSON body to the right path |
+| `api.test.ts` (8 tests) | A successful list. An error response becomes an `ApiError` with its status and the server's message. A 422 carries its errors per field. A network failure has status 0. A successful response that is not JSON is an `ApiError`. `createInspection` and `assignInspector` send `POST` with a JSON body to the right path. `startInspection` and `completeInspection` each post to their own path |
 | `InspectionList.test.tsx` | UI-201: each row shows status, registration and customer. UI-409: a click on a cell selects the row. UI-410: the "View" button is reached with Tab and used with Enter, and only the selected row's button is pressed |
 | `NextActionControl.test.tsx` | UI-301: the input and "Assign inspector", disabled for an empty name or spaces, and the name is sent trimmed. UI-302 and UI-303: the start and complete buttons, and nothing when there is no next action. The control is disabled while an action is pending |
 | `CreateInspectionForm.test.tsx` | UI-401: four fields and two buttons. UI-402: the typed values are sent and the server's inspection is handed on. UI-404: messages under their fields, tied with `aria-describedby`, values kept. UI-405: one message for another failure, values kept. UI-406: cancel sends nothing. UI-407: two submits in a row send one request, and the form is disabled meanwhile. OQ-403: an empty form is sent to the server, not blocked by the page |
-| `InspectionsPage.test.tsx` | UI-202, UI-203, UI-204: loading, empty and error. UI-408: the newest inspection is selected after loading. UI-402: a created inspection is first in the list and selected, and the form closes. UI-406: cancel shows the inspection selected before. UI-304: after a step the row and the detail show the new status. UI-305: a refused step shows the message and reloads the list. The message is not shown after another inspection is selected |
+| `InspectionDetail.test.tsx` | UI-205: every field of the detail, and a dash in place of notes or an inspector that are not set. UI-306: a time for each step taken and a dash for each not taken. UI-305: the message of a failed step is shown as an alert |
+| `InspectionsPage.test.tsx` | UI-202, UI-203, UI-204: loading, empty and error. UI-408: the newest inspection is selected after loading. UI-402: a created inspection is first in the list and selected, and the form closes. UI-406: cancel shows the inspection selected before. UI-304: after a step the row and the detail show the new status. UI-305: a refused step shows the message and reloads the list. The message is not shown after another inspection is selected. UI-401: "New inspection" is offered only once the list has loaded, not while the form is open, and not when the list failed. A second step cannot be triggered while the first is in flight |
 
 These tests are written after the code they cover, so they cannot be seen to fail first. In place of that, deliberate bugs are introduced one at a time after the tests pass, and the result is recorded here.
 
@@ -102,6 +104,17 @@ These tests are written after the code they cover, so they cannot be seen to fai
 | `api.ts` (6) | Field errors dropped. A network failure given another status. An unreadable success returned as null. Create posting to the wrong path. Assign sending the wrong field. The first field error not used as the message |
 
 These 27 were chosen by the person who wrote the tests, so the result says that these bugs are caught, and not that every bug would be.
+
+That warning proved right. A review from scratch tried 12 more, in parts the first 27 had not touched, and 8 passed every test:
+
+| Deliberate bug that no test caught | Closed by |
+|---|---|
+| The step times, the notes, or the requested date not shown in the detail. A missing inspector shown as "null" | `InspectionDetail.test.tsx`, which did not exist |
+| "New inspection" usable while the form is open, or before the list has loaded | The two UI-401 tests of the page |
+| The step buttons not disabled while a step is pending | The UI-304 test with a step in flight |
+| `startInspection` posting to `/complete` | The test of the start and complete paths |
+
+After the tests were added, those 12 and 8 others were tried again: 20 of 20 failed a test. Counting every bug tried in both rounds before the additions, 30 of 39 were caught.
 
 Not tested: layout and colour, the browser's own date picker, and the real server. The PHP tests cover the server, and section 10 of the two UI specs records the checks made in a real browser.
 
@@ -126,6 +139,9 @@ Owner of every item: the author.
 | DV-2 | A test first expected a late refusal to be shown when the user returned to its inspection. The expectation was removed, not the behaviour changed | TS-003 UI says the message is cleared when another row is selected. The test asked for more than the spec promises. What remains tested: the message is not shown under the other inspection, and the list is reloaded |
 | DV-3 | The README is not changed here | The author asked for it in a separate pull request |
 | DV-4 | One test, UI-407, sends two submit events with `requestSubmit()` and does not use `user-event` | Two events in the same tick are the case the guard exists for, and a simulated user cannot click twice in one tick |
+
+| DV-5 | Tests were added after a review of this pull request: one new file for the detail panel, and tests for the button states, the start and complete paths, and two fixes to the form | See the table in section 10. The review also found that two sentences in this spec were untrue: that the page moved unchanged, and that every test name starts with a criterion ID. Both are corrected |
+| DV-6 | `vitest.config.ts` also sets `unstubGlobals` | `api.test.ts` replaces `fetch` for the whole file, and nothing put it back |
 
 ### Verified against the code
 

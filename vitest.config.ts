@@ -8,5 +8,6 @@ export default defineConfig({
         include: ['resources/js/**/*.test.{ts,tsx}'],
         setupFiles: ['resources/js/test-setup.ts'],
         restoreMocks: true,
+        unstubGlobals: true,
     },
 });

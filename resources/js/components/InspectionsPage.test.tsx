@@ -119,6 +119,58 @@ describe('InspectionsPage', () => {
         ).toBe('true');
     });
 
+    it('UI-401 offers New inspection only once the list has loaded, and not while the form is open', async () => {
+        let answer: (value: Inspection[]) => void = () => undefined;
+        list.mockReturnValue(new Promise<Inspection[]>((resolve) => (answer = resolve)));
+        render(<InspectionsPage />);
+        const button = screen.getByRole('button', { name: 'New inspection' }) as HTMLButtonElement;
+
+        expect(button.disabled).toBe(true);
+
+        answer([newest]);
+        await screen.findByRole('table');
+        expect(button.disabled).toBe(false);
+
+        await userEvent.click(button);
+        expect(button.disabled).toBe(true);
+
+        await userEvent.click(panel().getByRole('button', { name: 'Cancel' }));
+        expect(button.disabled).toBe(false);
+    });
+
+    it('UI-401 does not offer New inspection when the list could not be loaded', async () => {
+        list.mockRejectedValue(new ApiError(500, 'Server Error'));
+
+        render(<InspectionsPage />);
+        await listPanel().findByRole('alert');
+
+        expect(
+            (screen.getByRole('button', { name: 'New inspection' }) as HTMLButtonElement).disabled,
+        ).toBe(true);
+    });
+
+    it('UI-304 does not let a second step be triggered while the first is in flight', async () => {
+        let answer: (value: Inspection) => void = () => undefined;
+        start.mockReturnValue(new Promise<Inspection>((resolve) => (answer = resolve)));
+        await loaded();
+        await userEvent.click(listPanel().getByText('Bob'));
+        const button = panel().getByRole('button', {
+            name: 'Start inspection',
+        }) as HTMLButtonElement;
+
+        await userEvent.click(button);
+
+        await vi.waitFor(() => expect(button.disabled).toBe(true));
+        await userEvent.click(button);
+        expect(start).toHaveBeenCalledTimes(1);
+
+        answer({ ...middle, status: 'in_progress', next_action: 'complete' });
+        const next = (await panel().findByRole('button', {
+            name: 'Complete inspection',
+        })) as HTMLButtonElement;
+        expect(next.disabled).toBe(false);
+    });
+
     it('UI-205 shows the inspection of the row that was selected', async () => {
         await loaded();
 
