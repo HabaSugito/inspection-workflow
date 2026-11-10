@@ -332,7 +332,7 @@ class InspectionWorkflowTest extends TestCase
     }
 
     #[DataProvider('validSteps')]
-    public function test_ac310_a_successful_step_updates_the_time_of_last_change(string $status, string $action): void
+    public function test_ac310_a_successful_step_updates_the_time_of_last_change(string $status, string $action, string $newStatus): void
     {
         $this->travelTo('2026-11-10 09:00:00');
         $inspection = $this->inspectionIn($status);
@@ -340,6 +340,7 @@ class InspectionWorkflowTest extends TestCase
         $this->travelTo('2026-11-10 15:00:00');
         $this->postJson("/api/inspections/{$inspection->id}/{$action}", ['inspector_name' => 'Sam Carter'])
             ->assertOk()
+            ->assertJsonPath('data.status', $newStatus)
             ->assertJsonPath('data.updated_at', '2026-11-10T15:00:00Z')
             ->assertJsonPath('data.created_at', '2026-11-10T09:00:00Z');
     }
