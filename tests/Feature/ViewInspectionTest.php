@@ -90,6 +90,11 @@ class ViewInspectionTest extends TestCase
         return [
             'a number that matches no inspection' => ['999999'],
             'not a number' => ['abc'],
+            'zero' => ['0'],
+            'a negative number' => ['-1'],
+            'a decimal' => ['1.5'],
+            'a number too large to be an id' => ['99999999999999999999999'],
+            'text that looks like SQL' => ["1' OR '1'='1"],
         ];
     }
 
@@ -99,5 +104,39 @@ class ViewInspectionTest extends TestCase
             ->assertNotFound()
             ->assertHeader('Content-Type', 'application/json')
             ->assertExactJson(['message' => 'Inspection not found.']);
+    }
+
+    #[DataProvider('unsupportedMethods')]
+    public function test_ac204_a_method_the_api_does_not_offer_returns_a_json_405(string $method, string $path): void
+    {
+        $inspection = Inspection::factory()->create();
+        $before = $inspection->fresh()->toArray();
+
+        $response = $this->json($method, str_replace('{id}', (string) $inspection->id, $path), ['status' => 'completed']);
+
+        $response->assertMethodNotAllowed()->assertJsonStructure(['message']);
+        $this->assertSame($before, $inspection->fresh()->toArray());
+        $this->assertDatabaseCount('inspections', 1);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function unsupportedMethods(): array
+    {
+        return [
+            'PUT one inspection' => ['PUT', '/api/inspections/{id}'],
+            'PATCH one inspection' => ['PATCH', '/api/inspections/{id}'],
+            'DELETE one inspection' => ['DELETE', '/api/inspections/{id}'],
+            'DELETE the list' => ['DELETE', '/api/inspections'],
+        ];
+    }
+
+    public function test_ac204_an_unknown_path_under_the_api_returns_a_json_404(): void
+    {
+        $this->get('/api/unknown')
+            ->assertNotFound()
+            ->assertHeader('Content-Type', 'application/json')
+            ->assertJsonStructure(['message']);
     }
 }

@@ -111,7 +111,10 @@ class CreateInspectionTest extends TestCase
         return [
             'not a date' => ['not-a-date'],
             'a day that does not exist' => ['2027-02-30'],
-            'another format' => ['01/12/2026'],
+            'day first' => ['12/01/2027'],
+            'no leading zeros' => ['2027-1-5'],
+            'a date with a time' => ['2027-01-05T10:00:00'],
+            'the 29th of February in a year that is not a leap year' => ['2027-02-29'],
         ];
     }
 
@@ -208,5 +211,156 @@ class CreateInspectionTest extends TestCase
         $response->assertCreated();
         $this->assertSame('AB12 CDE', $response->json('data.vehicle_registration'));
         $this->assertSame('AB12 CDE', DB::table('inspections')->value('vehicle_registration'));
+    }
+
+    public function test_ac104_the_29th_of_february_in_a_leap_year_is_accepted(): void
+    {
+        $this->postJson('/api/inspections', $this->validPayload(['requested_date' => '2028-02-29']))
+            ->assertCreated()
+            ->assertJsonPath('data.requested_date', '2028-02-29');
+    }
+
+    #[DataProvider('valuesOfTheWrongType')]
+    public function test_ac103_value_of_the_wrong_type_is_rejected(string $field, mixed $value): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload([$field => $value]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors([$field]);
+        $this->assertDatabaseCount('inspections', 0);
+    }
+
+    /**
+     * @return array<string, array{string, mixed}>
+     */
+    public static function valuesOfTheWrongType(): array
+    {
+        return [
+            'customer name as a list' => ['customer_name', ['Jane']],
+            'customer name as a number' => ['customer_name', 123],
+            'vehicle registration as a list' => ['vehicle_registration', ['AB12']],
+            'vehicle registration as a number' => ['vehicle_registration', 123],
+            'requested date as a list' => ['requested_date', ['2026-12-01']],
+            'requested date as a number' => ['requested_date', 20261201],
+            'notes as a list' => ['notes', ['a note']],
+            'notes as a number' => ['notes', 123],
+        ];
+    }
+
+    #[DataProvider('requiredFieldsWithEmptyValues')]
+    public function test_ac103_required_field_that_is_empty_is_rejected(string $field, mixed $value): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload([$field => $value]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors([$field]);
+        $this->assertDatabaseCount('inspections', 0);
+    }
+
+    /**
+     * @return array<string, array{string, mixed}>
+     */
+    public static function requiredFieldsWithEmptyValues(): array
+    {
+        $cases = [];
+
+        foreach (['customer_name', 'vehicle_registration', 'requested_date'] as $field) {
+            $cases["{$field} empty"] = [$field, ''];
+            $cases["{$field} spaces only"] = [$field, '   '];
+            $cases["{$field} null"] = [$field, null];
+        }
+
+        return $cases;
+    }
+
+    public function test_ac101_spaces_around_a_value_are_removed_and_spaces_inside_are_kept(): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload([
+            'customer_name' => '  Jane  Smith  ',
+            'vehicle_registration' => '  ab12 cde  ',
+        ]));
+
+        $response->assertCreated();
+        $row = DB::table('inspections')->first();
+        $this->assertSame('Jane  Smith', $row->customer_name);
+        $this->assertSame('AB12 CDE', $row->vehicle_registration);
+    }
+
+    public function test_ac102_empty_notes_are_stored_as_no_notes(): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload(['notes' => '']));
+
+        $response->assertCreated()->assertJsonPath('data.notes', null);
+        $this->assertNull(DB::table('inspections')->value('notes'));
+    }
+
+    public function test_ac101_text_in_other_scripts_is_stored_as_sent(): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload([
+            'customer_name' => '山田 太郎',
+            'notes' => 'Bring the service book 📘',
+        ]));
+
+        $response->assertCreated()
+            ->assertJsonPath('data.customer_name', '山田 太郎')
+            ->assertJsonPath('data.notes', 'Bring the service book 📘');
+    }
+
+    public function test_ac105_limits_count_characters_not_bytes(): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload([
+            'customer_name' => str_repeat('田', 255),
+        ]));
+
+        $response->assertCreated();
+    }
+
+    public function test_ac105_vehicle_registration_that_grows_past_its_limit_in_upper_case_is_rejected(): void
+    {
+        // "ß" becomes "SS" in upper case, so 20 characters become 40.
+        $response = $this->postJson('/api/inspections', $this->validPayload([
+            'vehicle_registration' => str_repeat('ß', 20),
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['vehicle_registration']);
+        $this->assertDatabaseCount('inspections', 0);
+    }
+
+    public function test_ac105_vehicle_registration_that_fits_its_limit_in_upper_case_is_accepted(): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload([
+            'vehicle_registration' => str_repeat('ß', 10),
+        ]));
+
+        $response->assertCreated();
+        $this->assertSame(str_repeat('SS', 10), DB::table('inspections')->value('vehicle_registration'));
+    }
+
+    public function test_ac107_id_and_timestamps_in_the_request_are_ignored(): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload([
+            'id' => 999,
+            'created_at' => '2000-01-01 00:00:00',
+            'updated_at' => '2000-01-01 00:00:00',
+        ]));
+
+        $response->assertCreated()->assertJsonPath('data.created_at', '2026-11-10T12:00:00Z');
+        $this->assertNotSame(999, $response->json('data.id'));
+        $this->assertDatabaseMissing('inspections', ['id' => 999]);
+    }
+
+    public function test_ac108_today_is_accepted_up_to_the_last_second_of_the_day(): void
+    {
+        $this->travelTo(self::TODAY.' 23:59:59');
+
+        $this->postJson('/api/inspections', $this->validPayload(['requested_date' => self::TODAY]))
+            ->assertCreated();
+    }
+
+    public function test_ac108_yesterday_is_rejected_from_the_first_second_of_the_day(): void
+    {
+        $this->travelTo(self::TODAY.' 00:00:00');
+
+        $this->postJson('/api/inspections', $this->validPayload(['requested_date' => '2026-11-09']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['requested_date']);
     }
 }
