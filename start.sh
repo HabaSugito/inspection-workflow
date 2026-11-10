@@ -32,6 +32,9 @@ vendor/bin/pint --test
 step "Check the TypeScript types"
 npm run typecheck
 
+step "Run the frontend tests"
+npm test
+
 step "Lint the frontend code"
 npm run lint
 

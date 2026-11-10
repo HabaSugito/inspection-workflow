@@ -16,6 +16,7 @@ An inspector must be assigned before an inspection can start.
 |---|---|
 | The workflow rules | `app/Enums/InspectionStatus.php` and `app/Services/InspectionWorkflow.php` |
 | The tests for valid and invalid transitions | `tests/Unit/InspectionStatusTest.php` and `tests/Feature/InspectionWorkflowTest.php` |
+| The tests for the UI | `resources/js/**/*.test.tsx`, each beside the component it tests |
 | What was built, and why | `specs/`, one folder per feature. See [the next section](#how-it-was-built-spec-driven-development) |
 | How the code is layered | `docs/architecture.md` |
 | The rules this repository was built under | `AGENTS.md` |
@@ -45,11 +46,15 @@ specs/
 │   ├── ds-002.md
 │   ├── ts-002-view-inspections-api.md     the two read endpoints
 │   └── ts-002-view-inspections-ui.md      the list and the detail panel
-└── SPEC-0003/                             Progress an inspection
-    ├── ds-003.md
-    ├── ts-003-inspection-workflow.md      the three actions and their rules
-    ├── ts-003-step-times.md               the time of each step
-    └── ts-003-inspection-workflow-ui.md   the control for the next action
+├── SPEC-0003/                             Progress an inspection
+│   ├── ds-003.md
+│   ├── ts-003-inspection-workflow.md      the three actions and their rules
+│   ├── ts-003-step-times.md               the time of each step
+│   └── ts-003-inspection-workflow-ui.md   the control for the next action
+└── SPEC-0004/                             Create and select inspections in the UI
+    ├── ds-004.md
+    ├── ts-004-create-and-select-ui.md     the form, and a list that is easy to open
+    └── ts-004-ui-tests.md                 automated tests for the UI
 ```
 
 | File | Holds | Rule |
@@ -88,7 +93,7 @@ Acceptance criteria have IDs, and each test name starts with the ID it covers. F
 
 - `ts-003-step-times.md` was written after its code. The workflow spec had grown past 15 files, and it was split in two afterwards.
 - Edge-case tests added by two later reviews were written after the code they cover. See [Known limitations](#known-limitations).
-- The UI has no automated tests, so "tests first" does not apply to it. The UI specs list checks made by hand in their place.
+- The UI tests were written after the UI. The first three UI specs were checked by hand only, and automated tests were added later, in `ts-004-ui-tests.md`. They could not be seen to fail first, so deliberate bugs were tried instead.
 
 Each of these is recorded in section 11 of the spec it concerns, under "Deviations from this spec".
 
@@ -110,6 +115,18 @@ php artisan serve
 
 Open http://localhost:8000. The sample data has inspections in every status.
 
+### Using the page
+
+The page has two panels. The list is on the left, and the right panel shows one inspection.
+
+| To | Do this |
+|---|---|
+| See an inspection | The newest one is shown when the page loads. Click any row, or its "View" button, to see another |
+| Create an inspection | Choose "New inspection", fill in the form in the right panel, and choose "Create inspection". If the input is refused, the reason is shown under the field |
+| Move an inspection forward | Use the button at the bottom of the right panel. It is "Assign inspector" (with a name), then "Start inspection", then "Complete inspection". Only the next valid step is offered |
+
+The form and the "View" buttons were added after a reviewer's feedback on the first submission. See [After the first submission](#after-the-first-submission).
+
 ### With Docker
 
 ```bash
@@ -125,6 +142,7 @@ Open http://localhost:8000. The image is for local review only. It keeps the dev
 | Check | Command |
 |---|---|
 | PHP tests (150) | `php artisan test` |
+| Frontend tests (55) | `npm test` |
 | PHP code style | `vendor/bin/pint --test` |
 | TypeScript types | `npm run typecheck` |
 | Frontend lint | `npm run lint` |
@@ -133,7 +151,7 @@ Open http://localhost:8000. The image is for local review only. It keeps the dev
 
 The tests use an in-memory SQLite database, so they do not touch the sample data.
 
-There are no automated tests for the React UI. See [Known limitations](#known-limitations).
+The frontend tests render the React components in a simulated browser (jsdom) and operate them by role and label, as a user or a screen reader would. The server is replaced at `resources/js/api.ts`, the one file that is allowed to make HTTP calls, and that file is tested against a replaced `fetch`. They do not run a real browser or the real server. See [Known limitations](#known-limitations).
 
 ## API
 
@@ -196,6 +214,20 @@ curl -X POST http://localhost:8000/api/inspections/8/start
 }
 ```
 
+## After the first submission
+
+A reviewer ran the first submission and reported that the page showed only a list: no form to add an inspection, no way to start one, and no way to send the details to the customer. The feedback was fair on two of the three points.
+
+| What the reviewer expected | What the first submission did | What changed |
+|---|---|---|
+| To see more than a list, and to start an inspection | Both existed, but the detail panel opened only when the registration text in a row was clicked, and nothing on the page said so. The brief asks for "a simple way" to do this. A way the reviewer did not find was not simple. This was a defect | The newest inspection is selected when the page loads. The whole row can be clicked, and each row has a "View" button |
+| A form to add an inspection | Creating was possible through the API only. The brief lists creating under "Laravel API", so the form was left out of the first design spec. The README did not say plainly that the page had no form | The page has a form. It calls the same endpoint |
+| To send the inspection details to the customer | Not built | Not built. The brief puts notifications out of scope. See below |
+
+The change went through the same steps as the rest: a design spec and a technical spec first (`specs/SPEC-0004/`), then the code. It needed no change to the API or the database.
+
+**Sending details to the customer, in production.** It would not be done inside the request that changes the status. The workflow service would record an event when a step succeeds, after the update is committed. A queued job would send the message, so a slow or failing mail provider cannot fail the step, and the job can be retried. That needs a customer contact field, which the brief's four fields do not include, and a record of what was sent.
+
 ## Key decisions
 
 Each technical spec records its decisions in section 11, with the alternative that was considered. These are the ones that shape the code most.
@@ -207,7 +239,9 @@ Each technical spec records its decisions in section 11, with the alternative th
 | Each step is a conditional update: `UPDATE ... WHERE id = ? AND status = <expected>` | Two requests for the same step cannot both succeed. It needs no lock and works on SQLite |
 | 409 for an action the status does not allow, 422 for input that is wrong in itself | A client can tell "fix your request" from "the inspection has moved on" |
 | The API returns `next_action` | The UI shows the control for that action and holds no workflow rules of its own |
+| The UI tests replace the server at `api.ts`, and nowhere else | It is the only place the architecture allows HTTP, so component tests stay about components and need no server |
 | No state-machine package | Three transitions do not justify a dependency |
+| The page does not check the form before sending it. It shows the server's messages under each field | One set of rules, on the server. A rule copied into the page can drift from the real one |
 | The inspector is stored as a name | The brief allows a name or an ID. A table of inspectors would add screens and endpoints that nothing asks for |
 | API and UI in one Laravel project | One install and one command to run, with no CORS setup |
 | Specs before code (spec-driven development) | Decisions are made and reviewed in a short document before they are made in code, where they cost more to change. See [How it was built](#how-it-was-built-spec-driven-development) |
@@ -217,6 +251,7 @@ Each technical spec records its decisions in section 11, with the alternative th
 The brief builds on an earlier system-design exercise. I did not take part in one, so the design specs under `specs/` stand in for it.
 
 - There is no authentication, as the brief says. Any caller can create an inspection and perform any step.
+- The page is used by an operations user, who enters the customer's request. The customer does not use it.
 - A vehicle registration is free text of up to 20 characters. It is stored in upper case. No country's format is enforced.
 - A requested date must be today or later, by the server's date in UTC.
 - Sending the same create request twice creates two inspections.
@@ -225,7 +260,8 @@ The brief builds on an earlier system-design exercise. I did not take part in on
 
 ## Known limitations
 
-- **No automated UI tests.** The UI is covered by the type check, the linter, the build, and checks made by hand in a browser. The steps and results are in section 10 of the two UI specs. Two paths in the UI were changed after review and not run: an unreadable response from the server, and a failed reload after a failed action.
+- **The UI tests do not use a real browser or the real server.** They run in jsdom with `api.ts` replaced, so layout, the browser's own date picker, and the join between the page and the API are not covered by them. Those were checked by hand, and the steps and results are in section 10 of the UI specs. A change to the shape of an API response would be caught by the PHP tests, not by the UI tests.
+- **A refusal that arrives late can be missed.** If the user selects another inspection while a step is still in flight and the step is then refused, the message is not shown when they return. The list is reloaded, so the status on screen is right.
 - **Two requests at exactly the same instant are not tested.** A test with a stale copy of an inspection proves the mechanism that protects against it, the conditional update, without running parallel processes.
 - **How an unusual ID is handled depends on SQLite.** `/api/inspections/01`, or an ID with a leading space, returns inspection 1, because SQLite converts the text to a number.
 - **The requested date has no upper limit.** `9999-12-31` is accepted.
@@ -239,7 +275,7 @@ The brief builds on an earlier system-design exercise. I did not take part in on
 
 ## With more time
 
-1. Automated tests for the UI, starting with the action control and the error path.
+1. Tests in a real browser against the real server, for the join that the UI tests replace.
 2. Authentication, then a rule for who may perform each step, then a record of who did.
 3. Pagination and filtering by status on the list.
 4. A constraint on the ID in the route, to remove the dependence on SQLite.
@@ -263,7 +299,7 @@ How the output was checked:
 - **Tests first.** For each feature the tests were written from the acceptance criteria and run before the code existed, to see them fail for the expected reason.
 - **One script for every check.** `./start.sh` was run before each pull request.
 - **Running the application.** The API was called on a running server, and the UI was used in a browser, for every feature.
-- **Deliberate bugs.** The code was broken on purpose, one change at a time, to see whether a test failed. The first round caught 19 of 28. The gaps were closed, and a second round on other parts of the code caught 6 of 10. Those gaps were closed too. These numbers describe the bugs that were tried, not the strength of the tests as a whole.
+- **Deliberate bugs.** The code was broken on purpose, one change at a time, to see whether a test failed. The first round caught 19 of 28. The gaps were closed, and a second round on other parts of the code caught 6 of 10. Those gaps were closed too. These numbers describe the bugs that were tried, not the strength of the tests as a whole. The UI tests went the same way: 26 of 27 in the first round, then 4 of 12 in a review that looked where the first round had not, and those gaps were closed as well.
 - **Two reviews.** The first looked at test coverage. The second started from scratch and is on the pull requests as review comments, with a reply for each finding saying what was done and whether it was run or only read. It found three serious problems. Two were tests that could not fail for the bug they were meant to catch, and the first review had missed both.
 - **Premises checked in the framework's source.** Each technical spec lists the assumptions about Laravel that were checked before the code was written.
 
