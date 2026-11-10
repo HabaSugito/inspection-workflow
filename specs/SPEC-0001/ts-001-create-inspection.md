@@ -147,7 +147,7 @@ Each test is written before the code it covers, run, and seen to fail for the re
 | AC-108 | With the clock fixed, yesterday's date returns 422 and today's date returns 201 |
 | AC-109 | A lower-case registration is returned in upper case, and the stored value is compared byte for byte so that a case-insensitive comparison cannot hide a failure |
 
-Not tested: nothing in this spec is left untested.
+Not tested: `InspectionFactory`. No test in this spec uses it (see DF-3). Everything else in this spec is covered.
 
 ## 11. Decisions, open questions, deferred items & risks
 
@@ -190,6 +190,7 @@ None.
 |---|---|---|
 | DF-1 | Protection against duplicate requests (idempotency key) | Not in any story |
 | DF-2 | Format check for vehicle registrations | Not in any story. Formats differ by country |
+| DF-3 | An automated test that uses `InspectionFactory` | The tests in this spec create inspections through the API, so none of them uses the factory. It was run once by hand and produced a valid inspection. TS-002 API is the first spec whose tests use it |
 
 ### Risks
 
