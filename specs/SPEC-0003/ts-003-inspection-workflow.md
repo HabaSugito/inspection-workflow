@@ -4,7 +4,7 @@
 |---|---|
 | Design spec | [DS-003](ds-003.md), acceptance criteria AC-301 to AC-311 |
 | Depends on | [TS-001](../SPEC-0001/ts-001-create-inspection.md), [TS-002 API](../SPEC-0002/ts-002-view-inspections-api.md) |
-| Files changed | 15 |
+| Files changed | 16 |
 
 **Aligns to architecture:** [docs/architecture.md](../../docs/architecture.md). No deviations.
 
@@ -34,6 +34,7 @@ Existing stack only. No new dependency. In particular, no state-machine package 
 | 12 | `database/seeders/DatabaseSeeder.php` | Modified | Sample inspections in every status |
 | 13 | `tests/Unit/InspectionStatusTest.php` | New | Section 10 |
 | 14 | `tests/Feature/InspectionWorkflowTest.php` | New | Section 10 |
+| 16 | `tests/Unit/InvalidTransitionTest.php` | New | The refusal messages (see DV-4) |
 | 15 | `tests/Feature/ViewInspectionTest.php` | Modified | The exact-body test for AC-203 expects the four new resource fields (see DV-1) |
 
 ## 4. Data model
@@ -183,6 +184,21 @@ Each test is written before the code it covers, run, and seen to fail for the re
 | AC-311 | In the AC-305 test the clock is moved forward one hour before the refused request, and the whole stored row, including the three times and `updated_at`, equals the row from before |
 | Section 5 | Two model instances are loaded for the same pending row. One is assigned through the service. Assigning the other, stale instance throws `InvalidTransition`, and the row still holds the first inspector's name |
 
+Added after a review of the test coverage (see DV-4). Each pins behaviour that was already correct, so none was seen to fail first:
+
+| AC | Test |
+|---|---|
+| AC-301 | An inspector name of exactly 255 characters is accepted |
+| AC-301 | Spaces around the inspector name are removed before it is stored |
+| AC-302 | The provider also covers `inspector_name` sent as null, a number and a list |
+| AC-305 | Other fields in an action request (`status`, `customer_name`, `completed_at`) are ignored, for each of the three actions |
+| AC-305 | `GET` on an action returns 405, and an action that is not in the workflow (`cancel`) returns 404. Neither changes the row |
+| AC-305 | A refused step is not reported to the error log |
+| AC-306 | The refusal for a missing inspector has the message `This inspection has no inspector, so it cannot be started.` |
+| AC-308 | `tests/Unit/InvalidTransitionTest.php`: the message, current status and allowed action for each of the four statuses, and for a missing inspector |
+| AC-310 | A successful step sets `updated_at` to the time of the step and leaves `created_at` unchanged |
+| — | The factory states `assigned()`, `inProgress()` and `completed()` produce rows the workflow could have produced: an inspector, and step times in order |
+
 Checked once by hand, not kept as tests: two deliberate bugs were introduced to confirm that the tests catch them. Removing the status condition from the update failed the stale-instance test. Letting `canTransitionTo` allow a step back to `pending` failed five unit tests.
 
 Not tested: two requests arriving at the same instant. The stale-instance test proves the same mechanism, the conditional update, without needing parallel processes.
@@ -210,6 +226,7 @@ Owner of every item: the author.
 |---|---|---|
 | DV-1 | `tests/Feature/ViewInspectionTest.php` was changed, which this spec did not first list | Its AC-203 test compares the whole response body. The resource now has four more fields, so the expected body changed with the intended behaviour. No assertion was loosened |
 | DV-2 | `bootstrap/app.php` also marks `InvalidTransition` as not reported | A refused step is an expected outcome. Without this, each 409 would be written to the error log |
+| DV-4 | Tests were added after the implementation, and `tests/Unit/InvalidTransitionTest.php` is a file this spec did not first list | A review of the coverage introduced 28 deliberate bugs across the application. Nine were not caught, among them a changed refusal message, a limit of 254 in place of 255, and a dropped `string` rule. The added tests close those gaps. One of the 28 is still not caught, and is harmless: the 404 handler would also apply outside `/api`, where no route takes an inspection ID |
 | DV-3 | The service reloads the model with `refresh()` before it throws for a lost race, and `InvalidTransition` is built through two named constructors | Keeps the three messages in one place |
 
 ### Open questions

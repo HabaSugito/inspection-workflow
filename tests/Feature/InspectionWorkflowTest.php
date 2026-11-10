@@ -7,6 +7,7 @@ use App\Models\Inspection;
 use App\Services\InspectionWorkflow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -391,5 +392,15 @@ class InspectionWorkflowTest extends TestCase
         $this->assertNotNull($completed['completed_at']);
         $this->assertLessThanOrEqual($completed['started_at'], $completed['assigned_at']);
         $this->assertLessThanOrEqual($completed['completed_at'], $completed['started_at']);
+    }
+
+    public function test_ac305_a_refused_step_is_not_reported_to_the_error_log(): void
+    {
+        Exceptions::fake();
+        $inspection = $this->inspectionIn('pending');
+
+        $this->postJson("/api/inspections/{$inspection->id}/start")->assertConflict();
+
+        Exceptions::assertNothingReported();
     }
 }
