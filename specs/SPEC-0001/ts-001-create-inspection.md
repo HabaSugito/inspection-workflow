@@ -201,6 +201,7 @@ Checked in the scaffolded project (Laravel 13.40) before implementation.
 | DV-3 | `StoreInspectionRequest` upper-cases the registration before validation | The defect found by the review: 20 "ß" passed the 20-character rule and was stored as 40 characters. SQLite does not enforce the column length, so nothing failed. Another database would have refused the row |
 | DV-4 | The AC-104 case `01/12/2026` was replaced by `12/01/2027` | Same problem as DV-1. Replacing `date_format` with the looser `date` rule left every test passing, because the old value was refused as a past date |
 | DV-5 | After a review of this pull request, the upper-casing was moved into one function used by both the model and the form request | It had been written twice. If one copy changed, a value could be validated in one form and stored in another |
+| DV-6 | The message for a date in the wrong format is written out: "The requested date must be a real date written as YYYY-MM-DD." | Laravel's own message shows the PHP format string, "Y-m-d", which means nothing to a user. Found in a final review, when the UI form showed it. A test was written first and seen to fail |
 
 ### Open questions
 

@@ -100,7 +100,9 @@ No change to `start.sh`. Its type check, ESLint, Prettier check and build cover 
 
 ## 10. Testing strategy
 
-No automated UI tests. UI-301 to UI-306 are checked by hand. The steps and the results are below, and the README repeats the steps.
+No automated UI tests in this spec. UI-301 to UI-306 are checked by hand. The steps and the results are below.
+
+Automated tests for the UI were added later, by [TS-004 UI tests](../SPEC-0004/ts-004-ui-tests.md). The checks by hand recorded here were made before those existed, and they stay as the record of what was seen in a real browser.
 
 | Check | How | Result |
 |---|---|---|
@@ -139,7 +141,7 @@ None.
 
 | ID | Item | Why deferred |
 |---|---|---|
-| DF-1 | Automated UI tests | See section 10 |
+| DF-1 | Automated UI tests | Deferred here. Added later by [TS-004 UI tests](../SPEC-0004/ts-004-ui-tests.md) |
 | DF-2 | Showing times in the user's preferred format and timezone | Not in any story. The browser's locale format is used |
 
 ### Risks

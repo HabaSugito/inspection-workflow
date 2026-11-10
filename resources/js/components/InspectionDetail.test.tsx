@@ -38,7 +38,7 @@ describe('InspectionDetail', () => {
 
         expect(screen.getByRole('heading').textContent).toBe('AB12 CDE');
         expect(valueOf('Customer')).toBe('Jane Smith');
-        expect(valueOf('Requested date')).toBe('2027-01-15');
+        expect(valueOf('Requested date')).toBe('15/01/2027');
         expect(valueOf('Notes')).toBe('Morning visit');
         expect(valueOf('Status')).toBe('Assigned');
         expect(valueOf('Inspector')).toBe('Sam Carter');
@@ -62,9 +62,11 @@ describe('InspectionDetail', () => {
             }),
         );
 
-        expect(valueOf('Assigned at')).toContain('2026');
+        // Day before month, as written in Australia. The day depends on the
+        // time zone of the machine that runs the test, so either is accepted.
+        expect(valueOf('Assigned at')).toMatch(/^1[01] Nov 2026, \d{1,2}:\d{2}\s?[ap]m$/i);
+        expect(valueOf('Started at')).toMatch(/^1[12] Nov 2026, \d{1,2}:\d{2}\s?[ap]m$/i);
         expect(valueOf('Assigned at')).not.toBe(valueOf('Started at'));
-        expect(valueOf('Started at')).toContain('2026');
         expect(valueOf('Completed at')).toBe('—');
         expect(screen.getByText('Times are shown in your local time zone.')).toBeTruthy();
     });
@@ -86,5 +88,11 @@ describe('InspectionDetail', () => {
         show(inspection());
 
         expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('UI-205 writes the requested date day first, and does not move it to another day', () => {
+        show(inspection({ requested_date: '2027-03-01' }));
+
+        expect(valueOf('Requested date')).toBe('01/03/2027');
     });
 });

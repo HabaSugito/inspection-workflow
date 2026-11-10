@@ -54,7 +54,7 @@ The baseline is the starting point that every technical spec builds on. It is no
 - The Laravel 13 skeleton, as created by `composer create-project laravel/laravel`, with its example tests removed. The skeleton's own `AGENTS.md`, `CLAUDE.md` and `README.md` are not used: this repository has its own.
 - React 19 and TypeScript on the skeleton's Vite setup: `@vitejs/plugin-react`, `tsconfig.json`, the page `resources/views/app.blade.php` served at `/`, and `resources/js/app.tsx`, which mounts an empty app.
 - ESLint (`eslint.config.js`) and Prettier (`.prettierrc.json`) for the frontend code. Pint, shipped by the skeleton, covers the PHP code.
-- `start.sh`, which installs dependencies, prepares the database and runs every check: the tests, Pint, the TypeScript type check, ESLint, the Prettier check and the frontend build.
+- `start.sh`, which installs dependencies, prepares the database and runs every check: the PHP tests, Pint, the TypeScript type check, the frontend tests, ESLint, the Prettier check and the frontend build. The frontend tests were added after the baseline, by TS-004 UI tests.
 - `Dockerfile` and `compose.yaml`, which run the app for local review. They are not a production setup.
 - `docs/architecture.md`, `AGENTS.md` and the specs.
 

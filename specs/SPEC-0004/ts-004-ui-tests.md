@@ -80,7 +80,7 @@ No change to the application's flow. The page component moves file. The only cha
 
 ## 10. Testing strategy
 
-A component test name starts with the ID of the criterion it covers. The tests of `api.ts` have no ID: that layer has no acceptance criterion of its own, and its tests are named for what they check. There are 55 tests in 6 files.
+A component test name starts with the ID of the criterion it covers. The tests of `api.ts` have no ID: that layer has no acceptance criterion of its own, and its tests are named for what they check. There are 57 tests in 6 files.
 
 | File | Covers |
 |---|---|

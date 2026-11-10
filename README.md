@@ -141,8 +141,8 @@ Open http://localhost:8000. The image is for local review only. It keeps the dev
 
 | Check | Command |
 |---|---|
-| PHP tests (150) | `php artisan test` |
-| Frontend tests (55) | `npm test` |
+| PHP tests (151) | `php artisan test` |
+| Frontend tests (57) | `npm test` |
 | PHP code style | `vendor/bin/pint --test` |
 | TypeScript types | `npm run typecheck` |
 | Frontend lint | `npm run lint` |
@@ -254,6 +254,7 @@ The brief builds on an earlier system-design exercise. I did not take part in on
 - The page is used by an operations user, who enters the customer's request. The customer does not use it.
 - A vehicle registration is free text of up to 20 characters. It is stored in upper case. No country's format is enforced.
 - A requested date must be today or later, by the server's date in UTC.
+- The application is for use in Australia, so the page shows dates day first: `15/01/2027`, and `10 Nov 2026, 8:43 pm` for a time. The API keeps ISO 8601, `2027-01-15`, which is what a program expects.
 - Sending the same create request twice creates two inspections.
 - The time of each step (assigned, started, completed) is recorded. The brief does not ask for this. It was added because an inspection's history is not readable from its status alone.
 - "Newest first" in the list means by ID, descending.
@@ -265,6 +266,9 @@ The brief builds on an earlier system-design exercise. I did not take part in on
 - **Two requests at exactly the same instant are not tested.** A test with a stale copy of an inspection proves the mechanism that protects against it, the conditional update, without running parallel processes.
 - **How an unusual ID is handled depends on SQLite.** `/api/inspections/01`, or an ID with a leading space, returns inspection 1, because SQLite converts the text to a number.
 - **The requested date has no upper limit.** `9999-12-31` is accepted.
+- **"Today" is judged in UTC, not in an Australian time zone.** In the morning in Sydney the server is still on the previous day, so yesterday's date is accepted for some hours. A real system would use the time zone of the business. Australia has several, and the brief does not say which.
+- **The date field of the form follows the browser's language.** It is the browser's own control. A browser set to Australian English shows it day first. A browser in another language shows its own order. The dates the page displays are day first in every browser.
+- **`npm audit` reports 10 moderate warnings.** All are in ESLint's dependencies, which are used for development only and are not sent to the browser. The fix offered is a breaking upgrade.
 - **The 20-character limit on the registration is enforced for the API only.** SQLite does not enforce the column length, so code that writes without going through the API could store a longer value.
 - **A row with an unknown status breaks the list.** The response fails with 500. Only the workflow service writes the status, and it writes valid values.
 - **The list is not paginated.**
@@ -300,7 +304,7 @@ How the output was checked:
 - **One script for every check.** `./start.sh` was run before each pull request.
 - **Running the application.** The API was called on a running server, and the UI was used in a browser, for every feature.
 - **Deliberate bugs.** The code was broken on purpose, one change at a time, to see whether a test failed. The first round caught 19 of 28. The gaps were closed, and a second round on other parts of the code caught 6 of 10. Those gaps were closed too. These numbers describe the bugs that were tried, not the strength of the tests as a whole. The UI tests went the same way: 26 of 27 in the first round, then 4 of 12 in a review that looked where the first round had not, and those gaps were closed as well.
-- **Two reviews.** The first looked at test coverage. The second started from scratch and is on the pull requests as review comments, with a reply for each finding saying what was done and whether it was run or only read. It found three serious problems. Two were tests that could not fail for the bug they were meant to catch, and the first review had missed both.
+- **Four reviews.** The first looked at test coverage. The second started from scratch and is on the pull requests as review comments, with a reply for each finding saying what was done and whether it was run or only read. It found three serious problems. Two were tests that could not fail for the bug they were meant to catch, and the first review had missed both. A third review covered the work added after the reviewer's feedback, and found that the first UI tests missed the detail panel and two of the three workflow requests. A fourth pass cloned `main` afresh and followed this README from the top, which is how the date field's problem with typed years was found.
 - **Premises checked in the framework's source.** Each technical spec lists the assumptions about Laravel that were checked before the code was written.
 
 What this did not catch on its own: both of those test gaps were found only when I asked for a second review from scratch. After the first review the assistant reported that 27 of 28 deliberate bugs were caught, which overstated the tests, because it had chosen the 28 itself.
