@@ -111,7 +111,9 @@ Null values are shown as "—", so `notes` and `inspector_name` never render as 
 
 ## 10. Testing strategy
 
-No automated UI tests. UI-201 to UI-205 are checked by hand. The steps and the results are below, and the README repeats the steps.
+No automated UI tests in this spec. UI-201 to UI-205 are checked by hand. The steps and the results are below.
+
+Automated tests for the UI were added later, by [TS-004 UI tests](../SPEC-0004/ts-004-ui-tests.md). The checks by hand recorded here were made before those existed, and they stay as the record of what was seen in a real browser.
 
 | Check | How | Result |
 |---|---|---|
@@ -158,7 +160,7 @@ None.
 
 | ID | Item | Why deferred |
 |---|---|---|
-| DF-1 | Automated UI tests | See section 10 |
+| DF-1 | Automated UI tests | Deferred here. Added later by [TS-004 UI tests](../SPEC-0004/ts-004-ui-tests.md) |
 | DF-2 | A create form | Not in any story of DS-002. Added later by [DS-004](../SPEC-0004/ds-004.md) |
 | DF-3 | Refreshing the list without reloading the page | Not in any story |
 
