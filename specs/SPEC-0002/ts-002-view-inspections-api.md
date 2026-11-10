@@ -93,9 +93,12 @@ Each test is written before the code it covers, run, and seen to fail for the re
 | AC | Test in `tests/Feature/ViewInspectionTest.php` |
 |---|---|
 | AC-201 | Three inspections are created in a known order. The list returns all three, and the IDs in the response are in descending order |
+| AC-201 | A list item carries the customer name, vehicle registration and status that the UI shows |
 | AC-202 | With an empty table, the list returns 200 and `data` is an empty array |
 | AC-203 | Retrieving an existing ID returns 200 and every field of that inspection, with another inspection present to show the right one is chosen |
 | AC-204 | An unknown numeric ID and a non-numeric ID each return 404 with exactly `{ "message": "Inspection not found." }`. One case sends no JSON `Accept` header |
+
+These tests create their inspections with `InspectionFactory`, which closes the deferred item DF-3 of TS-001.
 
 Not tested: the seeder. It only calls the factory, and `start.sh` runs it on every execution, so a failure there stops the script.
 
