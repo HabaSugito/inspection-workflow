@@ -16,9 +16,81 @@ An inspector must be assigned before an inspection can start.
 |---|---|
 | The workflow rules | `app/Enums/InspectionStatus.php` and `app/Services/InspectionWorkflow.php` |
 | The tests for valid and invalid transitions | `tests/Unit/InspectionStatusTest.php` and `tests/Feature/InspectionWorkflowTest.php` |
-| What was built, and why | `specs/`, one folder per feature |
+| What was built, and why | `specs/`, one folder per feature. See [the next section](#how-it-was-built-spec-driven-development) |
 | How the code is layered | `docs/architecture.md` |
 | The rules this repository was built under | `AGENTS.md` |
+
+## How it was built: spec-driven development
+
+This project was built with spec-driven development (SDD). The specs were written and reviewed first, and the code was written from them. A feature goes through three steps, in this order:
+
+1. **Design spec: what is built.** User stories, the acceptance criteria that follow from them, what is out of scope, and the assumptions. Anything that does not trace to a story is not built.
+2. **Technical spec: how it is built.** The files to change, the data model, the interfaces, the validation and error handling, the tests, and the decisions with the alternatives that were considered.
+3. **Code, tests first.** Each acceptance criterion becomes a named test before the code exists. The test is run and seen to fail, and then the code is written until it passes.
+
+After the code is written, the spec is updated to match what was built. Where the code departs from the spec, the spec says so and gives the reason.
+
+The history of the repository follows the same order. The specs were merged in their own pull request (#2) before any application code, and the technical specs were then built one pull request at a time (#4 to #8). The two specs for the workflow and its step times share one pull request.
+
+### The `specs/` folder
+
+One folder per design spec. It holds the design spec and the technical specs that implement it.
+
+```
+specs/
+├── SPEC-0001/                             Create an inspection
+│   ├── ds-001.md                          design spec
+│   └── ts-001-create-inspection.md        technical spec
+├── SPEC-0002/                             View inspections
+│   ├── ds-002.md
+│   ├── ts-002-view-inspections-api.md     the two read endpoints
+│   └── ts-002-view-inspections-ui.md      the list and the detail panel
+└── SPEC-0003/                             Progress an inspection
+    ├── ds-003.md
+    ├── ts-003-inspection-workflow.md      the three actions and their rules
+    ├── ts-003-step-times.md               the time of each step
+    └── ts-003-inspection-workflow-ui.md   the control for the next action
+```
+
+| File | Holds | Rule |
+|---|---|---|
+| `ds-NNN.md` | A design spec | At most about four user stories, so that it can be explained in two sentences |
+| `ts-NNN-<name>.md` | A technical spec for design spec `NNN` | Changes at most 15 files. A design spec that needs more is split into several technical specs with different names |
+
+Every technical spec has the same eleven sections, so a reader knows where to look:
+
+| Section | Answers |
+|---|---|
+| 1. Approach | What is the shape of the solution, in a few sentences? |
+| 2. Tech stack & dependencies | Is anything new added, and why could it not be avoided? |
+| 3. Module / component breakdown | Which files change, and what is each one for? |
+| 4. Data model | Which fields, of which types? |
+| 5. State, persistence & execution mode | Where is the source of truth, and what happens with two requests at once? |
+| 6. Interfaces | Which endpoints and function signatures, with which contracts? |
+| 7. Flow, navigation & data movement | What happens, step by step? |
+| 8. Validation, invariants & error handling | Which rules, and what does the caller see when one is broken? |
+| 9. Build, tooling & quality gates | Which checks run, and are there migrations? |
+| 10. Testing strategy | Which test covers which acceptance criterion, and what is not tested? |
+| 11. Decisions, open questions, deferred items & risks | What was decided and why, what was left out, and where does the code depart from the spec? |
+
+### How to trace a rule from the brief to a test
+
+Acceptance criteria have IDs, and each test name starts with the ID it covers. For example, the brief says an inspector is required before an inspection moves to `in_progress`:
+
+| Step | Where |
+|---|---|
+| Acceptance criterion AC-306 | `specs/SPEC-0003/ds-003.md` |
+| How it is built and tested | `specs/SPEC-0003/ts-003-inspection-workflow.md`, sections 8 and 10 |
+| The tests | `test_ac306_...` in `tests/Feature/InspectionWorkflowTest.php` |
+| The code | `InspectionWorkflow::start()` in `app/Services/InspectionWorkflow.php` |
+
+### Where the method was not followed
+
+- `ts-003-step-times.md` was written after its code. The workflow spec had grown past 15 files, and it was split in two afterwards.
+- Edge-case tests added by two later reviews were written after the code they cover. See [Known limitations](#known-limitations).
+- The UI has no automated tests, so "tests first" does not apply to it. The UI specs list checks made by hand in their place.
+
+Each of these is recorded in section 11 of the spec it concerns, under "Deviations from this spec".
 
 ## Setup
 
@@ -138,7 +210,7 @@ Each technical spec records its decisions in section 11, with the alternative th
 | No state-machine package | Three transitions do not justify a dependency |
 | The inspector is stored as a name | The brief allows a name or an ID. A table of inspectors would add screens and endpoints that nothing asks for |
 | API and UI in one Laravel project | One install and one command to run, with no CORS setup |
-| Specs before code | Each feature has a design spec (what) and one or more technical specs (how) under `specs/`. A technical spec changes at most 15 files |
+| Specs before code (spec-driven development) | Decisions are made and reviewed in a short document before they are made in code, where they cost more to change. See [How it was built](#how-it-was-built-spec-driven-development) |
 
 ## Assumptions
 
