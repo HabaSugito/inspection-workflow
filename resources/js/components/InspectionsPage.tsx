@@ -94,7 +94,10 @@ export function InspectionsPage() {
                 </button>
             </div>
             <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <section className="rounded-lg border border-gray-200 bg-white">
+                <section
+                    aria-label="Inspection list"
+                    className="rounded-lg border border-gray-200 bg-white"
+                >
                     {load === 'loading' && (
                         <p className="p-4 text-sm text-gray-500">Loading inspections…</p>
                     )}
@@ -114,7 +117,10 @@ export function InspectionsPage() {
                         />
                     )}
                 </section>
-                <section className="rounded-lg border border-gray-200 bg-white p-4">
+                <section
+                    aria-label="Selected inspection"
+                    className="rounded-lg border border-gray-200 bg-white p-4"
+                >
                     {creating ? (
                         <CreateInspectionForm
                             onCreated={addCreated}

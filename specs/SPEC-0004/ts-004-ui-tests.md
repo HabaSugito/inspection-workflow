@@ -43,7 +43,9 @@ Not added: `@testing-library/jest-dom`. Its matchers are a convenience, and plai
 | 10 | `resources/js/components/InspectionsPage.test.tsx` | New | Section 10 |
 | 11 | `start.sh` | Modified | Runs `npm test` |
 | 12 | `docs/architecture.md` | Modified | Where frontend tests live, and that `start.sh` runs them |
-| 13 | `README.md` | Modified | The test command and count. Removes "no automated UI tests" from the limitations |
+| 13 | `resources/js/test-fixtures.ts` | New | One function that builds a sample inspection for the tests |
+
+The README is updated in a separate pull request, at the author's request (see DV-3).
 
 ## 4. Data model
 
@@ -81,7 +83,7 @@ Each test name starts with the ID of the criterion it covers.
 
 | File | Covers |
 |---|---|
-| `api.test.ts` | A successful list. An error response becomes an `ApiError` with its status and the server's message. A 422 carries its errors per field. A network failure has status 0. A successful response that is not JSON is an `ApiError`. `createInspection` and `assignInspector` send `POST` with a JSON body to the right path |
+| `api.test.ts` (8 tests) | A successful list. An error response becomes an `ApiError` with its status and the server's message. A 422 carries its errors per field. A network failure has status 0. A successful response that is not JSON is an `ApiError`. `createInspection` and `assignInspector` send `POST` with a JSON body to the right path |
 | `InspectionList.test.tsx` | UI-201: each row shows status, registration and customer. UI-409: a click on a cell selects the row. UI-410: the "View" button is reached with Tab and used with Enter, and only the selected row's button is pressed |
 | `NextActionControl.test.tsx` | UI-301: the input and "Assign inspector", disabled for an empty name or spaces, and the name is sent trimmed. UI-302 and UI-303: the start and complete buttons, and nothing when there is no next action. The control is disabled while an action is pending |
 | `CreateInspectionForm.test.tsx` | UI-401: four fields and two buttons. UI-402: the typed values are sent and the server's inspection is handed on. UI-404: messages under their fields, tied with `aria-describedby`, values kept. UI-405: one message for another failure, values kept. UI-406: cancel sends nothing. UI-407: two submits in a row send one request, and the form is disabled meanwhile. OQ-403: an empty form is sent to the server, not blocked by the page |
@@ -89,9 +91,17 @@ Each test name starts with the ID of the criterion it covers.
 
 These tests are written after the code they cover, so they cannot be seen to fail first. In place of that, deliberate bugs are introduced one at a time after the tests pass, and the result is recorded here.
 
-| Deliberate bug | Result |
+27 deliberate bugs were tried, one at a time, each with the whole frontend suite run against it. 26 failed at least one test. One did not, and a test was added for it, after which it failed too.
+
+| Area | Deliberate bugs, each of which now fails a test |
 |---|---|
-| To be recorded after the build | |
+| Form (7) | The double-submit guard removed. Field errors not stored. The form-level message never shown, and always shown. The button left enabled while sending. "Cancel" also submitting. Old messages not cleared on a new attempt, which is the one that was first missed |
+| List (3) | The row click removed. No row marked as pressed. The wrong inspection selected |
+| Next-step control (3) | The name sent without trimming. Spaces accepted as a name. The start button calling complete |
+| Page (8) | The newest not selected on load. A created inspection added last, or not selected. Selecting not closing the form. The list not reloaded after a refusal. A refusal shown under any inspection. A successful step not updating the list. A failed reload not mentioned |
+| `api.ts` (6) | Field errors dropped. A network failure given another status. An unreadable success returned as null. Create posting to the wrong path. Assign sending the wrong field. The first field error not used as the message |
+
+These 27 were chosen by the person who wrote the tests, so the result says that these bugs are caught, and not that every bug would be.
 
 Not tested: layout and colour, the browser's own date picker, and the real server. The PHP tests cover the server, and section 10 of the two UI specs records the checks made in a real browser.
 
@@ -107,6 +117,15 @@ Owner of every item: the author.
 | D-2 | A separate technical spec and pull request | Add the tests to TS-004 create and select | DS-004 said the dependencies should be reviewed on their own. It also keeps that spec within 15 files |
 | D-3 | The page component moves to its own file | Export it from `app.tsx` | Importing `app.tsx` mounts the application as a side effect, which a test must not trigger |
 | D-4 | Tests sit beside the code, as `*.test.tsx` | A separate folder under `tests/` | `tests/` holds the PHP tests and is configured for PHPUnit. Beside the code, a missing test is easy to see |
+
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | `InspectionsPage.tsx` did change in one way when it moved: its two panels gained `aria-label`s, "Inspection list" and "Selected inspection" | A `<section>` without a name has no role, so the tests could not find a panel without relying on markup or CSS classes. The labels also name the panels for a screen reader |
+| DV-2 | A test first expected a late refusal to be shown when the user returned to its inspection. The expectation was removed, not the behaviour changed | TS-003 UI says the message is cleared when another row is selected. The test asked for more than the spec promises. What remains tested: the message is not shown under the other inspection, and the list is reloaded |
+| DV-3 | The README is not changed here | The author asked for it in a separate pull request |
+| DV-4 | One test, UI-407, sends two submit events with `requestSubmit()` and does not use `user-event` | Two events in the same tick are the case the guard exists for, and a simulated user cannot click twice in one tick |
 
 ### Verified against the code
 
