@@ -22,7 +22,7 @@ Existing stack only. No new dependency.
 |---|---|---|---|
 | 1 | `app/Http/Controllers/InspectionController.php` | Modified | Adds `index` and `show` |
 | 2 | `routes/api.php` | Modified | Adds `GET /api/inspections` and `GET /api/inspections/{inspection}` |
-| 3 | `bootstrap/app.php` | Modified | Renders a missing model under `api/*` as a 404 with a fixed message |
+| 3 | `bootstrap/app.php` | Modified | Renders a missing `Inspection` as a 404 with a fixed message |
 | 4 | `database/seeders/DatabaseSeeder.php` | Modified | Creates sample inspections, replacing the skeleton's sample user |
 | 5 | `tests/Feature/ViewInspectionTest.php` | New | Section 10 |
 
@@ -61,7 +61,7 @@ No change. Uses the `inspections` table from TS-001.
 No UI in this spec.
 
 - List: route → `InspectionController::index` → all inspections ordered by `id` descending → `InspectionResource::collection`.
-- Single: route → route model binding resolves `{inspection}` → `InspectionController::show` → `InspectionResource`. If no row matches, Laravel throws before the controller runs. Laravel turns the missing-model exception into a `NotFoundHttpException` that keeps the original as its previous exception. A render callback in `bootstrap/app.php` matches that case under `api/*` and returns the 404 body.
+- Single: route → route model binding resolves `{inspection}` → `InspectionController::show` → `InspectionResource`. If no row matches, Laravel throws before the controller runs. Laravel turns the missing-model exception into a `NotFoundHttpException` that keeps the original as its previous exception. A render callback in `bootstrap/app.php` matches that case when the missing model is an `Inspection` and returns the 404 body.
 
 ## 8. Validation, invariants & error handling
 
@@ -95,7 +95,7 @@ Each test is written before the code it covers, run, and seen to fail for the re
 | AC-201 | Three inspections are created in a known order. The list returns all three, and the IDs in the response are in descending order |
 | AC-201 | A list item carries the customer name, vehicle registration and status that the UI shows |
 | AC-202 | With an empty table, the list returns 200 and `data` is an empty array |
-| AC-203 | Retrieving an existing ID returns 200 and every field of that inspection, with another inspection present to show the right one is chosen |
+| AC-203 | Retrieving an existing ID returns 200 and every field of that inspection. One inspection is created before it and one after, so a controller that ignores the ID and returns the first or the last row fails the test |
 | AC-204 | An unknown numeric ID and a non-numeric ID each return 404 with exactly `{ "message": "Inspection not found." }`. One case sends no JSON `Accept` header |
 
 Added after a review of the test coverage. Each pins behaviour that was already correct, so none was seen to fail first:
@@ -108,7 +108,10 @@ Added after a review of the test coverage. Each pins behaviour that was already 
 
 These tests create their inspections with `InspectionFactory`, which closes the deferred item DF-3 of TS-001.
 
-Not tested: the seeder. It only calls the factory, and `start.sh` runs it on every execution, so a failure there stops the script.
+| AC | Added after a review of this pull request |
+|---|---|
+| AC-204 | The fixed message is used only for a missing inspection. A route for another model, defined in the test, does not answer "Inspection not found." Seen to fail first |
+| — | The seeder creates its sample inspections. `start.sh` also runs the seeder, but that only catches a seeder that throws |
 
 ## 11. Decisions, open questions, deferred items & risks
 
@@ -121,6 +124,13 @@ Owner of every item: the author.
 | D-1 | "Newest first" is ordering by `id` descending | Ordering by `created_at` | Rows created in the same second share a `created_at`, which would make the order unstable |
 | D-2 | The 404 is rendered in `bootstrap/app.php` | A `missing()` handler on each route | One place covers every route that takes an inspection ID, including those added by TS-003 |
 | D-3 | The 404 message is fixed text | Laravel's default message | The default includes the model's class name |
+
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | The AC-203 test was changed after a review | It created the wanted inspection last, so it was also the newest. Changing the controller to ignore the ID and return the newest row left every test passing. The expectation is unchanged; only the fixture order changed, and the test was then seen to fail against that controller |
+| DV-2 | The 404 handler now checks that the missing model is an `Inspection`, and no longer checks the path | It applied to any model under `api/*` while its message named inspections |
 
 ### Open questions
 
@@ -137,7 +147,7 @@ None.
 | ID | Risk | Mitigation |
 |---|---|---|
 | R-1 | The unpaginated list slows down as rows grow | Acceptable for sample data. See DF-1 |
-| R-2 | An ID written as `01`, or with a leading space, resolves to inspection 1, because SQLite converts the text to a number | Accepted. No other inspection can be reached this way. Listed in the README as a known limitation |
+| R-2 | How an unusual ID is handled depends on SQLite. `01`, or an ID with a leading space, resolves to inspection 1, because SQLite converts the text to a number. A number too large for the column returns 404 on SQLite, and would be an error on PostgreSQL | Accepted. No other inspection can be reached this way. Listed in the README as a known limitation. A route constraint would remove the dependency |
 
 ### Verified against the skeleton
 

@@ -41,7 +41,16 @@ class Inspection extends Model
     protected function vehicleRegistration(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => mb_strtoupper($value),
+            set: fn (string $value) => self::normaliseRegistration($value),
         );
+    }
+
+    /**
+     * The one definition of how a registration is stored. The form request
+     * validates this form, so the two cannot drift apart.
+     */
+    public static function normaliseRegistration(string $value): string
+    {
+        return mb_strtoupper($value);
     }
 }
