@@ -159,7 +159,7 @@ None.
 | ID | Item | Why deferred |
 |---|---|---|
 | DF-1 | Automated UI tests | See section 10 |
-| DF-2 | A create form | Not in any story |
+| DF-2 | A create form | Not in any story of DS-002. Added later by [DS-004](../SPEC-0004/ds-004.md) |
 | DF-3 | Refreshing the list without reloading the page | Not in any story |
 
 ### Risks
