@@ -72,7 +72,7 @@ class InspectionWorkflowTest extends TestCase
     }
 
     /**
-     * @return array<string, array{array<string, string>}>
+     * @return array<string, array{array<string, mixed>}>
      */
     public static function unusableInspectorNames(): array
     {
@@ -81,6 +81,9 @@ class InspectionWorkflowTest extends TestCase
             'empty' => [['inspector_name' => '']],
             'spaces only' => [['inspector_name' => '   ']],
             'longer than 255 characters' => [['inspector_name' => str_repeat('a', 256)]],
+            'null' => [['inspector_name' => null]],
+            'a number' => [['inspector_name' => 123]],
+            'a list' => [['inspector_name' => ['Sam Carter']]],
         ];
     }
 
@@ -166,7 +169,8 @@ class InspectionWorkflowTest extends TestCase
 
         $response->assertConflict()
             ->assertJsonPath('current_status', 'assigned')
-            ->assertJsonPath('allowed_action', null);
+            ->assertJsonPath('allowed_action', null)
+            ->assertJsonPath('message', 'This inspection has no inspector, so it cannot be started.');
         $this->assertSame($before, $this->storedRow($inspection));
     }
 
@@ -280,5 +284,112 @@ class InspectionWorkflowTest extends TestCase
         }
 
         $this->assertDatabaseHas('inspections', ['id' => $id, 'status' => 'assigned', 'inspector_name' => 'Sam Carter']);
+    }
+
+    public function test_ac301_an_inspector_name_of_exactly_255_characters_is_accepted(): void
+    {
+        $inspection = $this->inspectionIn('pending');
+        $name = str_repeat('a', 255);
+
+        $this->postJson("/api/inspections/{$inspection->id}/assign", ['inspector_name' => $name])
+            ->assertOk()
+            ->assertJsonPath('data.inspector_name', $name);
+    }
+
+    public function test_ac301_spaces_around_the_inspector_name_are_removed(): void
+    {
+        $inspection = $this->inspectionIn('pending');
+
+        $this->postJson("/api/inspections/{$inspection->id}/assign", ['inspector_name' => '  Sam Carter  '])
+            ->assertOk();
+
+        $this->assertSame('Sam Carter', DB::table('inspections')->where('id', $inspection->id)->value('inspector_name'));
+    }
+
+    #[DataProvider('validSteps')]
+    public function test_ac305_other_fields_in_an_action_request_are_ignored(string $status, string $action, string $newStatus): void
+    {
+        $inspection = $this->inspectionIn($status);
+        $before = $this->storedRow($inspection);
+
+        $response = $this->postJson("/api/inspections/{$inspection->id}/{$action}", [
+            'inspector_name' => 'Sam Carter',
+            'status' => 'completed',
+            'customer_name' => 'Changed',
+            'completed_at' => '2000-01-01 00:00:00',
+        ]);
+
+        $response->assertOk()->assertJsonPath('data.status', $newStatus);
+        $after = $this->storedRow($inspection);
+        $this->assertSame($newStatus, $after['status']);
+        $this->assertSame($before['customer_name'], $after['customer_name']);
+        $this->assertNotSame('2000-01-01 00:00:00', $after['completed_at']);
+
+        if ($action !== 'assign') {
+            $this->assertSame($before['inspector_name'], $after['inspector_name']);
+        }
+    }
+
+    #[DataProvider('validSteps')]
+    public function test_ac310_a_successful_step_updates_the_time_of_last_change(string $status, string $action): void
+    {
+        $this->travelTo('2026-11-10 09:00:00');
+        $inspection = $this->inspectionIn($status);
+
+        $this->travelTo('2026-11-10 15:00:00');
+        $this->postJson("/api/inspections/{$inspection->id}/{$action}", ['inspector_name' => 'Sam Carter'])
+            ->assertOk()
+            ->assertJsonPath('data.updated_at', '2026-11-10T15:00:00Z')
+            ->assertJsonPath('data.created_at', '2026-11-10T09:00:00Z');
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function validSteps(): array
+    {
+        return [
+            'assign' => ['pending', 'assign', 'assigned'],
+            'start' => ['assigned', 'start', 'in_progress'],
+            'complete' => ['in_progress', 'complete', 'completed'],
+        ];
+    }
+
+    #[DataProvider('actions')]
+    public function test_ac305_an_action_cannot_be_triggered_with_get(string $action): void
+    {
+        $inspection = $this->inspectionIn('pending');
+        $before = $this->storedRow($inspection);
+
+        $this->getJson("/api/inspections/{$inspection->id}/{$action}")->assertMethodNotAllowed();
+        $this->assertSame($before, $this->storedRow($inspection));
+    }
+
+    public function test_ac305_an_action_that_is_not_in_the_workflow_returns_404(): void
+    {
+        $inspection = $this->inspectionIn('pending');
+        $before = $this->storedRow($inspection);
+
+        $this->postJson("/api/inspections/{$inspection->id}/cancel")->assertNotFound();
+        $this->assertSame($before, $this->storedRow($inspection));
+    }
+
+    public function test_the_factory_states_describe_inspections_the_workflow_could_have_produced(): void
+    {
+        $assigned = $this->storedRow($this->inspectionIn('assigned'));
+        $inProgress = $this->storedRow($this->inspectionIn('in_progress'));
+        $completed = $this->storedRow($this->inspectionIn('completed'));
+
+        $this->assertNotNull($assigned['inspector_name']);
+        $this->assertNotNull($assigned['assigned_at']);
+        $this->assertNull($assigned['started_at']);
+
+        $this->assertNotNull($inProgress['started_at']);
+        $this->assertNull($inProgress['completed_at']);
+
+        $this->assertNotNull($completed['inspector_name']);
+        $this->assertNotNull($completed['completed_at']);
+        $this->assertLessThanOrEqual($completed['started_at'], $completed['assigned_at']);
+        $this->assertLessThanOrEqual($completed['completed_at'], $completed['started_at']);
     }
 }
