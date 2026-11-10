@@ -46,7 +46,7 @@ Table `inspections`.
 | `inspector_name` | string(255) | N | Null when created |
 | `created_at`, `updated_at` | timestamp | Y | Set by Laravel |
 
-`status` is a string column, not a database enum, so a later change to the set of statuses needs no schema change. The enum cast rejects an unknown value when a row is read.
+`status` is a string column, not a database enum, so a later change to the set of statuses needs no schema change. The enum cast throws when a row with an unknown value is read (see R-3).
 
 ## 5. State, persistence & execution mode
 
@@ -117,6 +117,7 @@ How the invariants are enforced:
 
 - The model's `$fillable` lists only the four input fields, and the controller passes only validated data. A `status` or `inspector_name` in the request therefore never reaches the model (AC-107).
 - Upper-casing is an attribute mutator on the model, using `mb_strtoupper`, so the factory, the seeder and the API all normalise the same way (AC-109).
+- The form request applies the same function, `Inspection::normaliseRegistration()`, before validation. Upper-casing can lengthen a value ("ß" becomes "SS"), so the 20-character limit is checked against the form that will be stored (AC-105).
 - "Today" is `today()` in the application timezone, which the skeleton sets to UTC (DS-001 A-104).
 
 ## 9. Build, tooling & quality gates
@@ -140,14 +141,30 @@ Each test is written before the code it covers, run, and seen to fail for the re
 | AC-101 | A valid request returns 201, the resource has status `pending` and a null inspector, and the row exists |
 | AC-102 | A request without `notes` returns 201 with null notes |
 | AC-103 | Data provider over the three required fields: each missing field returns 422 with an error under that key |
-| AC-104 | Data provider over invalid dates (`not-a-date`, `2026-02-30`, `01/12/2026`): each returns 422 with an error under `requested_date` |
+| AC-104 | Data provider over invalid dates: `not-a-date`, `2027-02-30`, `12/01/2027`, `2027-1-5`, `2027-01-05T10:00:00` and `2027-02-29`. Each returns 422 with an error under `requested_date`. Every date is in the future, so none can pass through the past-date rule. `2028-02-29`, a real leap day, is accepted |
 | AC-105 | Data provider over each field at one character above its limit: each returns 422. A value exactly at the limit is accepted |
 | AC-106 | A 422 body has `message` and `errors`, and the table is still empty. One case sends the request without a JSON `Accept` header and still gets JSON |
 | AC-107 | A request carrying `status: completed` and `inspector_name` returns 201 with status `pending` and a null inspector, and the row matches |
 | AC-108 | With the clock fixed, yesterday's date returns 422 and today's date returns 201 |
 | AC-109 | A lower-case registration is returned in upper case, and the stored value is compared byte for byte so that a case-insensitive comparison cannot hide a failure |
 
-Not tested: nothing in this spec is left untested.
+Added after a review of the test coverage (see DV-2 and DV-3):
+
+| AC | Test |
+|---|---|
+| AC-101 | Spaces around a value are removed and spaces inside it are kept |
+| AC-101 | Text in other scripts, and an emoji, are stored as sent |
+| AC-102 | Notes sent as an empty string are stored as null |
+| AC-103 | Data provider: each field sent as a list or a number returns 422 |
+| AC-103 | Data provider: each required field sent as an empty string, spaces only, or null returns 422 |
+| AC-105 | A limit counts characters, not bytes: 255 multi-byte characters are accepted |
+| AC-105 | A registration of 20 "ß" is rejected, because it is 40 characters in upper case. One of 10 "ß" is accepted and stored as 20 characters |
+| AC-107 | An `id`, `created_at` or `updated_at` in the request is ignored |
+| AC-108 | Today is accepted at 23:59:59, and yesterday is rejected at 00:00:00 |
+| AC-109 | The model upper-cases a registration written without going through the API. The form request now upper-cases too, so the API tests alone no longer prove the model's rule |
+| AC-107 | The model itself refuses `status` and `inspector_name` by mass assignment. The controller passes only validated fields, so the API test alone does not prove the model's rule |
+
+`InspectionFactory` is now used by the AC-109 test above, which closes DF-3 within this spec.
 
 ## 11. Decisions, open questions, deferred items & risks
 
@@ -157,7 +174,7 @@ Owner of every item: the author.
 
 | ID | Decision | Alternative considered | Reason |
 |---|---|---|---|
-| D-1 | Upper-casing lives in a model mutator | In the form request or the controller | Every writer of the column then normalises it identically |
+| D-1 | Upper-casing is defined once, in `Inspection::normaliseRegistration()`. The model's mutator applies it to every write, and the form request applies it before validation | Only in the form request, or only in the model | Every writer of the column normalises it identically, and the limit is checked against the form that is stored. See DV-3 |
 | D-2 | `status` is a string column with a PHP enum cast | A database enum column | No schema change when statuses change, and SQLite has no native enum |
 | D-3 | The skeleton's rule that all `api/*` errors render as JSON is kept and pinned by a test | Leave it untested | Later specs rely on it, and an API should not answer with an HTML error page |
 
@@ -174,6 +191,17 @@ Checked in the scaffolded project (Laravel 13.40) before implementation.
 | The application timezone is UTC | `config/app.php` |
 | Tests run against in-memory SQLite | `phpunit.xml` |
 
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | The AC-104 test uses `2027-02-30` where this spec first said `2026-02-30` | With the clock fixed at 2026-11-10, `2026-02-30` is also in the past, so the test could pass through the past-date rule (AC-108) without proving that an impossible date is rejected |
+
+| DV-2 | Tests were added after the implementation, not before it | A review of the coverage sent edge-case inputs to the running API and introduced deliberate bugs to see which the tests caught. It found one defect and several untested behaviours. The test for the defect was written first and seen to fail. The other tests pin behaviour that was already correct |
+| DV-3 | `StoreInspectionRequest` upper-cases the registration before validation | The defect found by the review: 20 "ß" passed the 20-character rule and was stored as 40 characters. SQLite does not enforce the column length, so nothing failed. Another database would have refused the row |
+| DV-4 | The AC-104 case `01/12/2026` was replaced by `12/01/2027` | Same problem as DV-1. Replacing `date_format` with the looser `date` rule left every test passing, because the old value was refused as a past date |
+| DV-5 | After a review of this pull request, the upper-casing was moved into one function used by both the model and the form request | It had been written twice. If one copy changed, a value could be validated in one form and stored in another |
+
 ### Open questions
 
 None.
@@ -184,9 +212,12 @@ None.
 |---|---|---|
 | DF-1 | Protection against duplicate requests (idempotency key) | Not in any story |
 | DF-2 | Format check for vehicle registrations | Not in any story. Formats differ by country |
+| DF-4 | An upper limit on the requested date | Not in any story. `9999-12-31` is accepted |
 
 ### Risks
 
 | ID | Risk | Mitigation |
 |---|---|---|
 | R-1 | A request made just after midnight UTC may be judged against a different "today" than the user's local date | Accepted for the exercise. A real system would take the user's or the site's timezone |
+| R-2 | The 20-character limit on the registration is enforced by the form request only. A writer that does not go through it, such as the factory, can store a longer value, because SQLite does not enforce the column length | Accepted. The API is the only writer outside tests and seeding. Another database would refuse the row |
+| R-3 | A row whose status is not one of the four values makes any response that includes it fail with 500, the list included. Checked by hand, not by a test | Accepted. Only `InspectionWorkflow` writes the column, and it writes enum values |
