@@ -98,6 +98,14 @@ Each test is written before the code it covers, run, and seen to fail for the re
 | AC-203 | Retrieving an existing ID returns 200 and every field of that inspection, with another inspection present to show the right one is chosen |
 | AC-204 | An unknown numeric ID and a non-numeric ID each return 404 with exactly `{ "message": "Inspection not found." }`. One case sends no JSON `Accept` header |
 
+Added after a review of the test coverage. Each pins behaviour that was already correct, so none was seen to fail first:
+
+| AC | Test |
+|---|---|
+| AC-204 | The unknown-ID provider also covers `0`, `-1`, `1.5`, a number too large to be an ID, and text that looks like SQL. Each returns the 404 body |
+| AC-204 | `PUT`, `PATCH` and `DELETE` on an inspection, and `DELETE` on the list, return a JSON 405 and change nothing. The API offers no way to edit or delete |
+| AC-204 | An unknown path under `/api` returns a JSON 404 |
+
 These tests create their inspections with `InspectionFactory`, which closes the deferred item DF-3 of TS-001.
 
 Not tested: the seeder. It only calls the factory, and `start.sh` runs it on every execution, so a failure there stops the script.
@@ -129,6 +137,7 @@ None.
 | ID | Risk | Mitigation |
 |---|---|---|
 | R-1 | The unpaginated list slows down as rows grow | Acceptable for sample data. See DF-1 |
+| R-2 | An ID written as `01`, or with a leading space, resolves to inspection 1, because SQLite converts the text to a number | Accepted. No other inspection can be reached this way. Listed in the README as a known limitation |
 
 ### Verified against the skeleton
 
