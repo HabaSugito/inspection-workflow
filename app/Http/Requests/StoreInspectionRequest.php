@@ -7,6 +7,19 @@ use Illuminate\Foundation\Http\FormRequest;
 class StoreInspectionRequest extends FormRequest
 {
     /**
+     * Upper-casing can lengthen a value ("ß" becomes "SS"), so the limit is
+     * checked against the form that will be stored.
+     */
+    protected function prepareForValidation(): void
+    {
+        $registration = $this->input('vehicle_registration');
+
+        if (is_string($registration)) {
+            $this->merge(['vehicle_registration' => mb_strtoupper($registration)]);
+        }
+    }
+
+    /**
      * @return array<string, list<string>>
      */
     public function rules(): array
