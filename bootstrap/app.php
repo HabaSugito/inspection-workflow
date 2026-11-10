@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Inspection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -24,7 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Laravel's own message for a missing model names the model class.
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
-            if ($request->is('api/*') && $e->getPrevious() instanceof ModelNotFoundException) {
+            $missing = $e->getPrevious();
+
+            if ($missing instanceof ModelNotFoundException && $missing->getModel() === Inspection::class) {
                 return response()->json(['message' => 'Inspection not found.'], 404);
             }
         });
