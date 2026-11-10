@@ -96,7 +96,7 @@ The typed values live in the form component, so they are kept across a refused s
 
 | Category | Rules |
 |---|---|
-| Validation | None in the page. No field is marked `required`, and the date input has no `min`. The server decides, and its messages are shown. This follows `docs/architecture.md`: the React app does not repeat the rules |
+| Validation | None in the page. No field is marked `required`, and the date input has no `min`. The date input does have `max="9999-12-31"`, which is not a check: the form has `noValidate`, so a browser never blocks it. It is there because without a maximum a browser accepts a six-digit year (see DV-5). The server decides, and its messages are shown. This follows `docs/architecture.md`: the React app does not repeat the rules |
 | Invariants | All HTTP calls go through `api.ts`. A created inspection is added to the list only from the server's 201 response, never from what the user typed, so the list shows the stored form: upper-case registration, null notes |
 | Error handling | 422: messages per field. Anything else, including a network failure: one message in the form |
 | User/system visibility | A field's messages are shown directly under it and tied to it with `aria-describedby`. The form-level message has `role="alert"` |
@@ -117,7 +117,7 @@ No change to `start.sh`. Its type check, ESLint, Prettier check and build cover 
 
 ## 10. Testing strategy
 
-No automated UI tests, as in the earlier UI specs (see OQ-404 in DS-004). The server's rules for the four fields are covered by the tests of TS-001. UI-401 to UI-410 are checked by hand in a browser, and the results are recorded in this table after the build.
+No automated UI tests in this spec, as in the earlier UI specs. OQ-404 in DS-004 was later reversed, and [ts-004-ui-tests.md](ts-004-ui-tests.md) adds them. The server's rules for the four fields are covered by the tests of TS-001. UI-401 to UI-410 are checked by hand in a browser, and the results are recorded in this table after the build.
 
 | Check | How | Result |
 |---|---|---|
@@ -159,6 +159,9 @@ Owner of every item: the author.
 | DV-4 | Changes after a review of this pull request. An error for a field the form does not have is now shown as the form-level message even when it arrives together with errors for known fields. The form resets its sending state after a success too | The first was lost in the mixed case, against section 8. The second made the form depend on its parent removing it. The review also found that DV-2 first claimed the button could be used when the list had failed, which the code never did. The sentence was wrong, not the code, and it is corrected above |
 | DV-3 | The registration in a row is plain text. The earlier button on it was removed | The whole row and the "View" button now select. Two buttons in one row for the same action would be read twice by a screen reader |
 
+| DV-5 | After a final review of `main`, the date input has `max="9999-12-31"` | In a browser whose date field starts with the year, typing `20270115` straight through gave the year `202701`, and the server refused the date. With a maximum the browser moves on to the month after four digits. Checked in such a browser before and after. A browser that starts with the day, as an Australian one does, was not checked |
+| DV-6 | Dates are shown day first, as written in Australia: the requested date as `15/01/2027`, and step times as `10 Nov 2026, 8:43 pm`. This is fixed to `en-AU` and does not follow the browser's language | The author's decision: the application is for use in Australia. The API keeps ISO 8601. The date field of the form is the browser's own control, so its order follows the browser's language and cannot be set by the page |
+
 ### Verified against the code
 
 Checked on `dev` before this spec was written.
@@ -179,7 +182,7 @@ None. OQ-401 to OQ-404 in DS-004 were decided by the author, and this spec follo
 
 | ID | Item | Why deferred |
 |---|---|---|
-| DF-1 | Automated UI tests | OQ-404. Listed first under "With more time" in the README |
+| DF-1 | Automated UI tests | Deferred here. Added by [ts-004-ui-tests.md](ts-004-ui-tests.md) after OQ-404 was reversed |
 | DF-2 | Sending the inspection details to the customer | A notification, which the brief puts out of scope |
 | DF-3 | Editing or deleting an inspection | Not in any story |
 
@@ -187,6 +190,6 @@ None. OQ-401 to OQ-404 in DS-004 were decided by the author, and this spec follo
 
 | ID | Risk | Mitigation |
 |---|---|---|
-| R-1 | The UI is checked by hand only | As in the earlier UI specs. The server's rules are tested, and the page holds none |
+| R-1 | When this spec was built the UI was checked by hand only | Closed by [ts-004-ui-tests.md](ts-004-ui-tests.md) |
 | R-2 | Two users who create at the same time do not see each other's inspection until they reload | Accepted. The list has always been loaded once per page view (TS-002 UI DF-3) |
 | R-3 | A browser that does not support `<input type="date">` shows a text field, and the user may type another format | The server refuses it with a message under the field (UI-404) |

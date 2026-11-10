@@ -32,4 +32,15 @@ class StoreInspectionRequest extends FormRequest
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            // Laravel's own message shows the PHP format string, "Y-m-d".
+            'requested_date.date_format' => 'The requested date must be a real date written as YYYY-MM-DD.',
+        ];
+    }
 }

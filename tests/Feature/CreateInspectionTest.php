@@ -385,4 +385,15 @@ class CreateInspectionTest extends TestCase
             'inspector_name' => null,
         ]);
     }
+
+    public function test_ac104_the_message_for_a_wrong_date_format_names_the_format_in_plain_words(): void
+    {
+        $response = $this->postJson('/api/inspections', $this->validPayload(['requested_date' => '202701-12-15']));
+
+        $response->assertUnprocessable()->assertJsonPath(
+            'errors.requested_date.0',
+            'The requested date must be a real date written as YYYY-MM-DD.',
+        );
+        $this->assertDatabaseCount('inspections', 0);
+    }
 }

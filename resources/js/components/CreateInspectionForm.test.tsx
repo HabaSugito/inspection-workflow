@@ -54,6 +54,13 @@ describe('CreateInspectionForm', () => {
         ]);
     });
 
+    it('UI-401 limits the year of the date field to four digits, so typed digits move on to the month', () => {
+        setup();
+
+        expect(field('Requested date').max).toBe('9999-12-31');
+        expect(field('Customer name').getAttribute('max')).toBeNull();
+    });
+
     it('UI-402 sends what was typed and hands on the inspection the server returned', async () => {
         const stored = inspection({ id: 9, vehicle_registration: 'AB12 CDE' });
         create.mockResolvedValue(stored);
