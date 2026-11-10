@@ -101,7 +101,7 @@ The typed values live in the form component, so they are kept across a refused s
 | Error handling | 422: messages per field. Anything else, including a network failure: one message in the form |
 | User/system visibility | A field's messages are shown directly under it and tied to it with `aria-describedby`. The form-level message has `role="alert"` |
 
-A message for a field the form does not have cannot occur today, because the form sends exactly the four fields the server validates. If it did, it would be shown as the form-level message, so that no error is lost.
+A message for a field the form does not have cannot occur today, because the form sends exactly the four fields the server validates. If it did, it would be shown as the form-level message, whether or not there are also messages for known fields, so that no error is lost.
 
 ## 9. Build, tooling & quality gates
 
@@ -155,7 +155,8 @@ Owner of every item: the author.
 | ID | Deviation | Reason |
 |---|---|---|
 | DV-1 | The form checks a ref, `inFlight`, before it submits, in addition to the `submitting` state in section 5 | The check for UI-407 failed on the first build: two clicks in the same instant created two inspections. `submitting` disables the button only after the next render, so both clicks passed it. A ref changes at once |
-| DV-2 | The "New inspection" button is in the page header, next to the title, not inside the left panel | It stays visible and usable while the list is loading or has failed, and it does not move when the list changes length |
+| DV-2 | The "New inspection" button is in the page header, next to the title, not inside the left panel | It does not move when the list changes length or is replaced by a message. It can be used only once the list has loaded: it is disabled while the list is loading, after the list has failed to load, and while the form is open. If the list cannot be loaded the server is not answering, and a form that could not be submitted would help nobody |
+| DV-4 | Changes after a review of this pull request. An error for a field the form does not have is now shown as the form-level message even when it arrives together with errors for known fields. The form resets its sending state after a success too | The first was lost in the mixed case, against section 8. The second made the form depend on its parent removing it. The review also found that DV-2 first claimed the button could be used when the list had failed, which the code never did. The sentence was wrong, not the code, and it is corrected above |
 | DV-3 | The registration in a row is plain text. The earlier button on it was removed | The whole row and the "View" button now select. Two buttons in one row for the same action would be read twice by a screen reader |
 
 ### Verified against the code
