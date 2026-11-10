@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { listInspections } from './api';
+import { assignInspector, completeInspection, listInspections, startInspection } from './api';
 import { InspectionDetail } from './components/InspectionDetail';
 import { InspectionList } from './components/InspectionList';
 import type { Inspection } from './types';
@@ -12,6 +12,8 @@ function App() {
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [load, setLoad] = useState<LoadState>('loading');
     const [loadError, setLoadError] = useState('');
+    const [pendingAction, setPendingAction] = useState(false);
+    const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -35,6 +37,39 @@ function App() {
 
     const selected = inspections.find((inspection) => inspection.id === selectedId) ?? null;
 
+    function select(id: number) {
+        setSelectedId(id);
+        setActionError(null);
+    }
+
+    async function run(id: number, action: () => Promise<Inspection>) {
+        setPendingAction(true);
+
+        try {
+            const updated = await action();
+
+            setInspections((current) =>
+                current.map((inspection) => (inspection.id === updated.id ? updated : inspection)),
+            );
+            setActionError(null);
+        } catch (error: unknown) {
+            let message = error instanceof Error ? error.message : 'Unknown error.';
+
+            // The refusal may mean the list is out of date, so show what the server has now.
+            try {
+                setInspections(await listInspections());
+            } catch {
+                message += ' The list could not be refreshed, so it may be out of date.';
+            }
+
+            // Kept with its inspection, so it is not shown under another one
+            // selected while the request was in flight.
+            setActionError({ id, message });
+        } finally {
+            setPendingAction(false);
+        }
+    }
+
     return (
         <main className="mx-auto max-w-5xl p-6">
             <h1 className="text-2xl font-semibold">Inspections</h1>
@@ -55,13 +90,26 @@ function App() {
                         <InspectionList
                             inspections={inspections}
                             selectedId={selectedId}
-                            onSelect={setSelectedId}
+                            onSelect={select}
                         />
                     )}
                 </section>
                 <section className="rounded-lg border border-gray-200 bg-white p-4">
                     {selected ? (
-                        <InspectionDetail inspection={selected} />
+                        <InspectionDetail
+                            inspection={selected}
+                            pendingAction={pendingAction}
+                            actionError={
+                                actionError?.id === selected.id ? actionError.message : null
+                            }
+                            onAssign={(name) =>
+                                run(selected.id, () => assignInspector(selected.id, name))
+                            }
+                            onStart={() => run(selected.id, () => startInspection(selected.id))}
+                            onComplete={() =>
+                                run(selected.id, () => completeInspection(selected.id))
+                            }
+                        />
                     ) : (
                         <p className="text-sm text-gray-500">
                             Select an inspection to see its details.
