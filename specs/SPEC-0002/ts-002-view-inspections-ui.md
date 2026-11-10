@@ -109,14 +109,14 @@ Null values are shown as "—", so `notes` and `inspector_name` never render as 
 
 ## 10. Testing strategy
 
-No automated UI tests. UI-201 to UI-205 are checked by hand, following the steps recorded in the README, and the result is recorded there.
+No automated UI tests. UI-201 to UI-205 are checked by hand. The steps and the results are below, and the README repeats the steps.
 
-| Check | How |
-|---|---|
-| UI-201, UI-205 | Run with seeded data. Compare the rows and the detail panel with the API response |
-| UI-202 | Reload with the network throttled in the browser's developer tools |
-| UI-203 | Run against an empty table (`php artisan migrate:fresh` without `--seed`) |
-| UI-204 | Block requests to `/api/inspections` in the browser's developer tools, then reload the page |
+| Check | How | Result |
+|---|---|---|
+| UI-201, UI-205 | Run with seeded data. Compare the rows and the detail panel with the API response | Passed. Five rows matched the API response. Selecting a row marked it and showed its fields. A null inspector showed as "—" |
+| UI-202 | Reload with the network throttled in the browser's developer tools | Not checked. The browser used for the checks could not throttle the network. The message is rendered by the same condition as the others |
+| UI-203 | Run against an empty table (`php artisan migrate:fresh` without `--seed`) | Passed. "No inspections yet." was shown |
+| UI-204 | Make `GET /api/inspections` fail, then reload the page | Passed. With the `inspections` table dropped the API returned 500, and the page showed "Could not load inspections." followed by the API's message |
 
 Why this is acceptable: the brief asks for the backend and its tests to take priority, and this UI holds no rules. `tsc` checks that the UI uses the API types correctly, ESLint checks the rules of hooks, and `npm run build` checks that it compiles.
 
@@ -157,4 +157,5 @@ None.
 
 | ID | Risk | Mitigation |
 |---|---|---|
+| R-2 | With `APP_DEBUG=true`, a server error message shown by the page includes internal detail such as SQL | This is Laravel's debug behaviour and applies to local runs only. With debug off the API answers "Server Error" |
 | R-1 | The UI is only checked by hand, so a regression would not be caught by `start.sh` | The UI holds no rules. `tsc`, ESLint and the build are run by `start.sh` |
