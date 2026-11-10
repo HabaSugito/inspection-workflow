@@ -32,6 +32,9 @@ class Inspection extends Model
         return [
             'requested_date' => 'date:Y-m-d',
             'status' => InspectionStatus::class,
+            'assigned_at' => 'datetime',
+            'started_at' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 
