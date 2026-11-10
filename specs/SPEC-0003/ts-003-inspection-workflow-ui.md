@@ -56,6 +56,7 @@ The inspector name being typed is local state of `NextActionControl`.
 | `startInspection(id): Promise<Inspection>` | TypeScript function in `api.ts` | Calls `POST /api/inspections/{id}/start` |
 | `completeInspection(id): Promise<Inspection>` | TypeScript function in `api.ts` | Calls `POST /api/inspections/{id}/complete` |
 | `<NextActionControl action disabled onAssign onStart onComplete />` | React component | Renders the control for `action`, or nothing when it is null |
+| `<InspectionDetail inspection pendingAction actionError onAssign onStart onComplete />` | React component | Adds the step times, the error message and the control to the detail panel |
 
 Each function returns `data` from the response and throws `ApiError` with the response's `message` on failure. For a 422, the first field error is used as the message.
 
@@ -87,7 +88,7 @@ Each function returns `data` from the response and throws `ApiError` with the re
 
 ## 9. Build, tooling & quality gates
 
-No change to `start.sh`. `npm run typecheck` and `npm run build` cover the changed files.
+No change to `start.sh`. Its type check, ESLint, Prettier check and build cover the changed files.
 
 | Area | Notes |
 |---|---|
@@ -99,13 +100,13 @@ No change to `start.sh`. `npm run typecheck` and `npm run build` cover the chang
 
 ## 10. Testing strategy
 
-No automated UI tests. UI-301 to UI-306 are checked by hand, following the steps recorded in the README, and the result is recorded there.
+No automated UI tests. UI-301 to UI-306 are checked by hand. The steps and the results are below, and the README repeats the steps.
 
-| Check | How |
-|---|---|
-| UI-301 to UI-304, UI-306 | With seeded data, take one pending inspection through assign, start and complete. After each step, check the list row, the detail panel, the step times and the control |
-| UI-303 | Select a completed inspection and confirm that no control is shown |
-| UI-305 | Open the page in two tabs. Assign the same inspection in the first tab, then try to assign it in the second. The second shows the 409 message and then the `assigned` status |
+| Check | How | Result |
+|---|---|---|
+| UI-301 to UI-304, UI-306 | With seeded data, take one pending inspection through assign, start and complete. After each step, check the list row, the detail panel, the step times and the control | Passed. The input and "Assign inspector" button were shown, with the button disabled while the name was empty. After each step the row and the panel showed the new status, the step's time appeared, and the control changed to the next action |
+| UI-303 | Select a completed inspection and confirm that no control is shown | Passed. The detail panel held no button or input |
+| UI-305 | Select a pending inspection. Assign it from outside the page, as a second tab would, then try to assign it in the page | Passed. The page showed "This inspection is assigned. The only action allowed is: start.", the row and the panel changed to `assigned`, and the inspector set by the first request was kept. The outside request was sent to the API directly instead of from a second tab |
 
 Why this is acceptable: the rules are on the server and are covered by the tests in TS-003 workflow. The UI only renders `next_action`, and `tsc` checks that every value of `NextAction` is handled.
 
@@ -137,5 +138,5 @@ None.
 
 | ID | Risk | Mitigation |
 |---|---|---|
-| R-1 | The UI is only checked by hand | The UI holds no rules. `tsc` and the build are run by `start.sh` |
+| R-1 | The UI is only checked by hand | The UI holds no rules. `tsc`, ESLint and the build are run by `start.sh` |
 | R-2 | The list in one browser tab goes stale when another user acts | An action on a stale row is refused by the server and the list is then reloaded (D-2) |
