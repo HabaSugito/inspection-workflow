@@ -31,7 +31,8 @@ A request passes through these layers, in this order.
 
 | Location | Holds |
 |---|---|
-| `resources/js/app.tsx` | Entry point and page state |
+| `resources/js/app.tsx` | Entry point. Mounts the page and nothing else |
+| `resources/js/components/InspectionsPage.tsx` | The page and its state |
 | `resources/js/api.ts` | All HTTP calls |
 | `resources/js/types.ts` | Types for API data |
 | `resources/js/components` | Presentational components. They receive data and callbacks as props |
@@ -42,8 +43,9 @@ A request passes through these layers, in this order.
 |---|---|---|
 | `tests/Unit` | Unit | Code with no database or HTTP, such as enums |
 | `tests/Feature` | Feature | HTTP endpoints, and services that need the database. Runs against an in-memory SQLite database |
+| `resources/js/**/*.test.ts(x)` | Frontend | React components and `api.ts`. Each test file sits beside the file it tests. Components are rendered in a simulated browser, with the functions of `api.ts` replaced |
 
-`./start.sh` runs every test and check. A test placed anywhere else is not run.
+`./start.sh` runs every test and check: `php artisan test` for the first two rows and `npm test` for the third. A test placed anywhere else is not run.
 
 ## Baseline
 
