@@ -8,8 +8,6 @@
 
 **Aligns to architecture:** [docs/architecture.md](../../docs/architecture.md). No deviations.
 
-This spec assumes the proposed answers to OQ-401 to OQ-404 in DS-004. If the author decides otherwise, the affected section is rewritten before any code.
-
 ## 1. Approach
 
 The API is not changed: `POST /api/inspections` exists and is tested. The page gains one function in `api.ts` to call it, and one component for the form. The right panel shows either the detail or the form, chosen by one piece of state in `app.tsx`. The list makes selection obvious: the whole row is clickable, each row has a "View" button, and the newest inspection is selected after the first load.
@@ -164,7 +162,7 @@ Checked on `dev` before this spec was written.
 
 ### Open questions
 
-OQ-401 to OQ-404 in DS-004. This spec is built only after the author has answered them.
+None. OQ-401 to OQ-404 in DS-004 were decided by the author, and this spec follows the outcomes.
 
 ### Deferred
 
