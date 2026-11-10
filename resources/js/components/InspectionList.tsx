@@ -21,7 +21,6 @@ export function InspectionList({ inspections, selectedId, onSelect }: Props) {
                 {inspections.map((inspection) => (
                     <tr
                         key={inspection.id}
-                        aria-selected={inspection.id === selectedId}
                         className={`border-b border-gray-100 last:border-0 ${
                             inspection.id === selectedId ? 'bg-blue-50' : 'hover:bg-gray-50'
                         }`}
@@ -32,6 +31,7 @@ export function InspectionList({ inspections, selectedId, onSelect }: Props) {
                         <td className="px-4 py-2 font-mono">
                             <button
                                 type="button"
+                                aria-pressed={inspection.id === selectedId}
                                 className="cursor-pointer underline-offset-2 hover:underline"
                                 onClick={() => onSelect(inspection.id)}
                             >
