@@ -44,7 +44,7 @@ The server is the source of truth. State added to `app.tsx`:
 | State | Type | Meaning |
 |---|---|---|
 | `pendingAction` | `boolean` | True while an action request is in flight. The control is disabled |
-| `actionError` | `string \| null` | Message from the last failed action. Cleared when another row is selected or an action succeeds |
+| `actionError` | `{ id, message } \| null` | The last failed action: the inspection it was for and the message. Shown only while that inspection is selected. Cleared when another row is selected or an action succeeds |
 
 The inspector name being typed is local state of `NextActionControl`.
 
@@ -74,14 +74,14 @@ Each function returns `data` from the response and throws `ApiError` with the re
 2. The user triggers the control. `pendingAction` becomes true and the control is disabled.
 3. `app.tsx` calls the matching function in `api.ts`.
 4. On success, the returned inspection replaces the one with the same ID in `inspections`. The list row and the detail panel both show the new status (UI-304), and the control changes to the next action.
-5. On failure, `actionError` is set to the message, and the list is reloaded so the current status is shown (UI-305).
+5. On failure, the list is reloaded so the current status is shown (UI-305), and `actionError` is set to the message with the inspection's ID. If the reload fails too, the message says that the list may be out of date.
 6. `pendingAction` becomes false.
 
 ## 8. Validation, invariants & error handling
 
 | Category | Rules |
 |---|---|
-| Validation | The "Assign inspector" button is disabled while the name is empty or only spaces. The server remains the authority and still validates |
+| Validation | The "Assign inspector" button is disabled while the name is empty or only spaces. This is the only server rule the page anticipates. The length limit is not copied into the page: a name that is too long is sent, and the 422 message is shown. The server remains the authority |
 | Invariants | The control is chosen only from `next_action`. No component compares `status` to decide what is allowed. All HTTP calls go through `api.ts` |
 | Error handling | 409, 422, 404, network failure and any other error are handled the same way: show the message, reload the list |
 | User/system visibility | The message is shown in the detail panel, above the control |
@@ -107,6 +107,7 @@ No automated UI tests. UI-301 to UI-306 are checked by hand. The steps and the r
 | UI-301 to UI-304, UI-306 | With seeded data, take one pending inspection through assign, start and complete. After each step, check the list row, the detail panel, the step times and the control | Passed. The input and "Assign inspector" button were shown, with the button disabled while the name was empty. After each step the row and the panel showed the new status, the step's time appeared, and the control changed to the next action |
 | UI-303 | Select a completed inspection and confirm that no control is shown | Passed. The detail panel held no button or input |
 | UI-305 | Select a pending inspection. Assign it from outside the page, as a second tab would, then try to assign it in the page | Passed. The page showed "This inspection is assigned. The only action allowed is: start.", the row and the panel changed to `assigned`, and the inspector set by the first request was kept. The outside request was sent to the API directly instead of from a second tab |
+| After the review | Repeat the UI-305 steps, then select another inspection | Passed. The 409 message was shown for the inspection it belonged to and was gone after another row was selected. The input had no `maxlength`, and the selected row's button had `aria-pressed="true"`. The case where the selection changes while a request is in flight was not run: it follows from the error carrying its ID |
 
 Why this is acceptable: the rules are on the server and are covered by the tests in TS-003 workflow. The UI only renders `next_action`, and `tsc` checks that every value of `NextAction` is handled.
 
@@ -122,6 +123,13 @@ Owner of every item: the author.
 | D-2 | After a failed action the list is reloaded | Only showing the message | A 409 means the copy in the browser is out of date. Reloading shows the actual status |
 | D-3 | All action failures are handled the same way | Separate handling per status code | One path is simpler, and the server's message already says what went wrong |
 | D-4 | The control is its own component | Inline in `InspectionDetail` | Keeps the switch over `NextAction` in one small file that `tsc` can check for exhaustiveness |
+
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | Changes after a review of this pull request. The error is kept with the ID of its inspection. A failed reload is reported in the message. `maxLength` was removed from the input. The step-time rows are labelled "Assigned at", "Started at" and "Completed at", and a line says the times are in the local time zone | An error for one inspection could appear under another selected while the request was in flight. A failed reload was swallowed. `maxLength={255}` copied a server rule into the page, against `docs/architecture.md`. "Assigned" as a row label read like the status |
+| DV-2 | UI-305 was checked by sending the first request straight to the API, not from a second tab | The same 409 path in the page is exercised. Two people on two screens was not what was run |
 
 ### Open questions
 

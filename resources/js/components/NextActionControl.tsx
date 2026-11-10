@@ -31,7 +31,6 @@ export function NextActionControl({ action, disabled, onAssign, onStart, onCompl
                         <input
                             type="text"
                             value={inspectorName}
-                            maxLength={255}
                             disabled={disabled}
                             onChange={(event) => setInspectorName(event.target.value)}
                             className="mt-1 rounded-md border border-gray-300 px-2 py-1.5"

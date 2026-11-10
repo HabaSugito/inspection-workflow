@@ -22,7 +22,9 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function formatTime(value: string | null): string {
-    return value === null ? '—' : new Date(value).toLocaleString();
+    return value === null
+        ? '—'
+        : new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 export function InspectionDetail({
@@ -44,10 +46,11 @@ export function InspectionDetail({
                 <Field label="Requested date">{inspection.requested_date}</Field>
                 <Field label="Inspector">{inspection.inspector_name ?? '—'}</Field>
                 <Field label="Notes">{inspection.notes ?? '—'}</Field>
-                <Field label="Assigned">{formatTime(inspection.assigned_at)}</Field>
-                <Field label="Started">{formatTime(inspection.started_at)}</Field>
-                <Field label="Completed">{formatTime(inspection.completed_at)}</Field>
+                <Field label="Assigned at">{formatTime(inspection.assigned_at)}</Field>
+                <Field label="Started at">{formatTime(inspection.started_at)}</Field>
+                <Field label="Completed at">{formatTime(inspection.completed_at)}</Field>
             </dl>
+            <p className="mt-2 text-xs text-gray-500">Times are shown in your local time zone.</p>
             <div className="mt-4 space-y-3">
                 {actionError !== null && (
                     <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-700">

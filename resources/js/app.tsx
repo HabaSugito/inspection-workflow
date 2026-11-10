@@ -13,7 +13,7 @@ function App() {
     const [load, setLoad] = useState<LoadState>('loading');
     const [loadError, setLoadError] = useState('');
     const [pendingAction, setPendingAction] = useState(false);
-    const [actionError, setActionError] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -42,7 +42,7 @@ function App() {
         setActionError(null);
     }
 
-    async function run(action: () => Promise<Inspection>) {
+    async function run(id: number, action: () => Promise<Inspection>) {
         setPendingAction(true);
 
         try {
@@ -53,11 +53,18 @@ function App() {
             );
             setActionError(null);
         } catch (error: unknown) {
-            setActionError(error instanceof Error ? error.message : 'Unknown error.');
+            let message = error instanceof Error ? error.message : 'Unknown error.';
+
             // The refusal may mean the list is out of date, so show what the server has now.
-            await listInspections()
-                .then(setInspections)
-                .catch(() => undefined);
+            try {
+                setInspections(await listInspections());
+            } catch {
+                message += ' The list could not be refreshed, so it may be out of date.';
+            }
+
+            // Kept with its inspection, so it is not shown under another one
+            // selected while the request was in flight.
+            setActionError({ id, message });
         } finally {
             setPendingAction(false);
         }
@@ -92,10 +99,16 @@ function App() {
                         <InspectionDetail
                             inspection={selected}
                             pendingAction={pendingAction}
-                            actionError={actionError}
-                            onAssign={(name) => run(() => assignInspector(selected.id, name))}
-                            onStart={() => run(() => startInspection(selected.id))}
-                            onComplete={() => run(() => completeInspection(selected.id))}
+                            actionError={
+                                actionError?.id === selected.id ? actionError.message : null
+                            }
+                            onAssign={(name) =>
+                                run(selected.id, () => assignInspector(selected.id, name))
+                            }
+                            onStart={() => run(selected.id, () => startInspection(selected.id))}
+                            onComplete={() =>
+                                run(selected.id, () => completeInspection(selected.id))
+                            }
                         />
                     ) : (
                         <p className="text-sm text-gray-500">
