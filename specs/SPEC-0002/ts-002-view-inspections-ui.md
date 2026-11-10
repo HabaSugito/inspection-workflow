@@ -67,6 +67,8 @@ The selected inspection is found in `inspections` by `selectedId`. It is not sto
 | `GET /` | Web page | Returns the page that mounts the React app |
 | `listInspections(): Promise<Inspection[]>` | TypeScript function in `api.ts` | Calls `GET /api/inspections` and returns `data`. Throws `ApiError` if the response is not 2xx or the request fails |
 | `ApiError` | TypeScript class in `api.ts` | Carries `status` (HTTP status, or 0 for a network failure) and `message` |
+
+A successful response whose body is not JSON is also thrown as an `ApiError`, so a caller never receives `null`.
 | `<InspectionList inspections selectedId onSelect />` | React component | Renders the rows and calls `onSelect(id)` |
 | `<InspectionDetail inspection />` | React component | Renders the fields of one inspection |
 | `<StatusBadge status />` | React component | Renders the status as a label |
@@ -109,14 +111,14 @@ Null values are shown as "—", so `notes` and `inspector_name` never render as 
 
 ## 10. Testing strategy
 
-No automated UI tests. UI-201 to UI-205 are checked by hand, following the steps recorded in the README, and the result is recorded there.
+No automated UI tests. UI-201 to UI-205 are checked by hand. The steps and the results are below, and the README repeats the steps.
 
-| Check | How |
-|---|---|
-| UI-201, UI-205 | Run with seeded data. Compare the rows and the detail panel with the API response |
-| UI-202 | Reload with the network throttled in the browser's developer tools |
-| UI-203 | Run against an empty table (`php artisan migrate:fresh` without `--seed`) |
-| UI-204 | Block requests to `/api/inspections` in the browser's developer tools, then reload the page |
+| Check | How | Result |
+|---|---|---|
+| UI-201, UI-205 | Run with seeded data. Compare the rows and the detail panel with the API response | Passed. Five rows matched the API response. Selecting a row marked it and showed its fields. A null inspector showed as "—" |
+| UI-202 | Delay the list response, then reload. A six-second `sleep` was put in the list endpoint for the check and removed afterwards, because the browser used could not throttle the network | Passed. "Loading inspections…" was shown until the response arrived, and then the list replaced it |
+| UI-203 | Run against an empty table (`php artisan migrate:fresh` without `--seed`) | Passed. "No inspections yet." was shown |
+| UI-204 | Make `GET /api/inspections` fail, then reload the page | Passed. With the `inspections` table dropped the API returned 500, and the page showed "Could not load inspections." followed by the API's message |
 
 Why this is acceptable: the brief asks for the backend and its tests to take priority, and this UI holds no rules. `tsc` checks that the UI uses the API types correctly, ESLint checks the rules of hooks, and `npm run build` checks that it compiles.
 
@@ -141,6 +143,13 @@ Owner of every item: the author.
 | `/` serves a page that mounts a React app from `resources/js/app.tsx` | Opened in a browser: the heading renders and the console has no errors |
 | No HTTP client is installed | `package.json` |
 
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | Two changes after a review of this pull request. `api.ts` throws `ApiError` for a successful response that is not JSON. The selected row is marked with `aria-pressed` on its button | Without the first, such a response reached the caller as `null` and failed with a JavaScript error, outside the contract in section 6. The second replaces `aria-selected` on a table row, where it has no meaning |
+| DV-2 | UI-202 was checked with a temporary delay in the endpoint, not with network throttling | The browser used could not throttle. The delay was never committed |
+
 ### Open questions
 
 None.
@@ -157,4 +166,6 @@ None.
 
 | ID | Risk | Mitigation |
 |---|---|---|
+| R-2 | With `APP_DEBUG=true`, a server error message shown by the page includes internal detail such as SQL | This is Laravel's debug behaviour and applies to local runs only. With debug off the API answers "Server Error" |
 | R-1 | The UI is only checked by hand, so a regression would not be caught by `start.sh` | The UI holds no rules. `tsc`, ESLint and the build are run by `start.sh` |
+| R-3 | The response is cast to the TypeScript type without a check at run time. `tsc` proves that the UI agrees with `types.ts`, and not that `types.ts` agrees with the API | Accepted at this size. The types are written from the resource in TS-001, and the exact-body test for AC-203 fails if the resource changes shape, which is the prompt to update the type |
