@@ -106,6 +106,11 @@ export function CreateInspectionForm({ onCreated, onCancel }: Props) {
                                 <input
                                     {...common}
                                     type={type}
+                                    // Without a maximum a browser accepts a six-digit
+                                    // year, so digits typed straight through never
+                                    // reach the month. This shapes typing only: the
+                                    // form does not validate, and the server decides.
+                                    max={type === 'date' ? '9999-12-31' : undefined}
                                     onChange={(event) =>
                                         setValues({ ...values, [name]: event.target.value })
                                     }
