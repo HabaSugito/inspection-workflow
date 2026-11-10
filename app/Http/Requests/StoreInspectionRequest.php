@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Inspection;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreInspectionRequest extends FormRequest
@@ -15,7 +16,7 @@ class StoreInspectionRequest extends FormRequest
         $registration = $this->input('vehicle_registration');
 
         if (is_string($registration)) {
-            $this->merge(['vehicle_registration' => mb_strtoupper($registration)]);
+            $this->merge(['vehicle_registration' => Inspection::normaliseRegistration($registration)]);
         }
     }
 
