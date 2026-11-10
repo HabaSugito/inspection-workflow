@@ -67,6 +67,8 @@ specs/
     ts-001-create-inspection.md
 ```
 
+A design spec that comes from feedback on finished work, such as `SPEC-0004`, says so under "Why this spec exists".
+
 | File | Holds |
 |---|---|
 | `ds-NNN.md` | A design spec: what is built. At most about four user stories |
