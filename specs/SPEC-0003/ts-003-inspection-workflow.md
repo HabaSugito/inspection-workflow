@@ -4,7 +4,7 @@
 |---|---|
 | Design spec | [DS-003](ds-003.md), acceptance criteria AC-301 to AC-311 |
 | Depends on | [TS-001](../SPEC-0001/ts-001-create-inspection.md), [TS-002 API](../SPEC-0002/ts-002-view-inspections-api.md) |
-| Files changed | 14 |
+| Files changed | 15 |
 
 **Aligns to architecture:** [docs/architecture.md](../../docs/architecture.md). No deviations.
 
@@ -34,6 +34,7 @@ Existing stack only. No new dependency. In particular, no state-machine package 
 | 12 | `database/seeders/DatabaseSeeder.php` | Modified | Sample inspections in every status |
 | 13 | `tests/Unit/InspectionStatusTest.php` | New | Section 10 |
 | 14 | `tests/Feature/InspectionWorkflowTest.php` | New | Section 10 |
+| 15 | `tests/Feature/ViewInspectionTest.php` | Modified | The exact-body test for AC-203 expects the four new resource fields (see DV-1) |
 
 ## 4. Data model
 
@@ -102,7 +103,14 @@ Fields added to the inspection resource:
 }
 ```
 
-`allowed_action` is null for a completed inspection, and for an assigned inspection that has no inspector (AC-306), because no action can proceed.
+`allowed_action` is null for a completed inspection, and for an assigned inspection that has no inspector (AC-306), because no action can proceed. The message differs in those two cases:
+
+| Case | `message` |
+|---|---|
+| Completed | `This inspection is completed. No further action is allowed.` |
+| Assigned with no inspector, on `start` | `This inspection has no inspector, so it cannot be started.` |
+
+In a message, `in_progress` is written `in progress`.
 
 A 404 for an unknown ID uses the handling from TS-002 API.
 
@@ -162,16 +170,20 @@ Each test is written before the code it covers, run, and seen to fail for the re
 |---|---|
 | AC-301 | Assigning a pending inspection returns 200 with status `assigned`, the inspector name and `next_action: start` |
 | AC-302 | Data provider: `inspector_name` missing, empty, and spaces only each return 422. A 256-character name returns 422 |
+| AC-302 | `assign` with no name on a completed inspection returns 422, not 409: validation runs before the status check |
 | AC-303 | Starting an assigned inspection returns 200 with status `in_progress` and `next_action: complete` |
 | AC-304 | Completing an in-progress inspection returns 200 with status `completed` and `next_action: null` |
-| AC-305 | Data provider over the 9 invalid pairs of status and action (4 statuses × 3 actions, minus the 3 valid ones). Each returns 409 |
+| AC-305 | Data provider over the 9 invalid pairs of status and action (4 statuses × 3 actions, minus the 3 valid ones). Each returns 409 with the current status and the allowed action. A separate test asserts that the provider has 9 pairs |
 | AC-306 | An inspection with status `assigned` and a null inspector is refused on `start` with 409 and `allowed_action: null` |
 | AC-308 | The 409 body has `message`, `current_status` and `allowed_action` with the expected values for a pending inspection asked to `start` |
+| AC-308 | A completed inspection asked to `complete` returns the "No further action" message and `allowed_action: null` |
 | AC-309 | Each of the three actions on an unknown ID returns the 404 body |
 | AC-310 | With the clock fixed at three different times, a full run through assign, start and complete records each time, and each earlier time is unchanged by later steps |
 | AC-310 | An inspection created through `POST /api/inspections` has all three times null and `next_action: assign` |
-| AC-311 | After each refused action in the AC-305 provider, all three times equal their values from before the request |
+| AC-311 | In the AC-305 test the clock is moved forward one hour before the refused request, and the whole stored row, including the three times and `updated_at`, equals the row from before |
 | Section 5 | Two model instances are loaded for the same pending row. One is assigned through the service. Assigning the other, stale instance throws `InvalidTransition`, and the row still holds the first inspector's name |
+
+Checked once by hand, not kept as tests: two deliberate bugs were introduced to confirm that the tests catch them. Removing the status condition from the update failed the stale-instance test. Letting `canTransitionTo` allow a step back to `pending` failed five unit tests.
 
 Not tested: two requests arriving at the same instant. The stale-instance test proves the same mechanism, the conditional update, without needing parallel processes.
 
@@ -191,6 +203,14 @@ Owner of every item: the author.
 | D-6 | Inspector stored as a name | An `inspectors` table with a foreign key | The brief allows a name. A table adds CRUD that no story asks for |
 | D-7 | Step times added by a second migration | Editing the migration from TS-001 | Each technical spec stays a self-contained change |
 | D-8 | `InvalidTransition` holds no HTTP knowledge. The 409 is built in `bootstrap/app.php` | A `render()` method on the exception | The service layer stays free of HTTP, as the architecture requires |
+
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | `tests/Feature/ViewInspectionTest.php` was changed, which this spec did not first list | Its AC-203 test compares the whole response body. The resource now has four more fields, so the expected body changed with the intended behaviour. No assertion was loosened |
+| DV-2 | `bootstrap/app.php` also marks `InvalidTransition` as not reported | A refused step is an expected outcome. Without this, each 409 would be written to the error log |
+| DV-3 | The service reloads the model with `refresh()` before it throws for a lost race, and `InvalidTransition` is built through two named constructors | Keeps the three messages in one place |
 
 ### Open questions
 
