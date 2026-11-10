@@ -101,7 +101,7 @@ The typed values live in the form component, so they are kept across a refused s
 | Error handling | 422: messages per field. Anything else, including a network failure: one message in the form |
 | User/system visibility | A field's messages are shown directly under it and tied to it with `aria-describedby`. The form-level message has `role="alert"` |
 
-A message for a field the form does not have cannot occur today, because the form sends exactly the four fields the server validates. If it did, it would be shown as the form-level message, so that no error is lost.
+A message for a field the form does not have cannot occur today, because the form sends exactly the four fields the server validates. If it did, it would be shown as the form-level message, whether or not there are also messages for known fields, so that no error is lost.
 
 ## 9. Build, tooling & quality gates
 
@@ -121,14 +121,16 @@ No automated UI tests, as in the earlier UI specs (see OQ-404 in DS-004). The se
 
 | Check | How | Result |
 |---|---|---|
-| UI-408 | Load the page with seeded data. Then load it against an empty table | To be recorded |
-| UI-409, UI-410 | Click a row outside its text. Then select another row with Tab and Enter only | To be recorded |
-| UI-401, UI-402, UI-403 | Create an inspection with a lower-case registration and no notes. Compare the new row and its detail with `GET /api/inspections` | To be recorded |
-| UI-404 | Submit the empty form. Then submit a past date with the other fields filled in | To be recorded |
-| UI-405 | Stop the server, then submit valid input | To be recorded |
-| UI-406 | Select an inspection, open the form, type in it, and cancel | To be recorded |
-| UI-407 | Delay the create endpoint for a few seconds, as was done for UI-202, and try to submit twice | To be recorded |
-| Regression | Repeat the TS-003 UI checks UI-301 to UI-305 on an inspection created from the page | To be recorded |
+| UI-408 | Load the page with seeded data. Then load it against an empty table | Passed. With seven seeded inspections the newest was selected, and the right panel showed its detail and the control to assign an inspector. With an empty table the list said "No inspections yet." and the right panel said "No inspection selected. Create one with New inspection." |
+| UI-409, UI-410 | Click a row outside its text. Then select another row with the keyboard | Passed. A click on the customer cell selected the row. With focus on another row's "View" button, Enter selected that row, and only its button reported `aria-pressed="true"`. Focus was placed on the button by script, not by pressing Tab |
+| UI-401, UI-402, UI-403 | Create an inspection with a lower-case registration and no notes. Compare the new row and its detail with `GET /api/inspections` | Passed. The form closed, the new row was first and selected, and the detail showed `AB12 CDE`, status Pending, notes "—" and the control to assign. The API returned the same values, with `notes: null` |
+| UI-404 | Submit the empty form. Then submit a past date with the other fields filled in | Passed. The empty form showed "… field is required." under each of the three required fields and nothing under notes. The past date showed the server's message under the date only, and the name, registration and date typed were still in the fields. No row was added either time |
+| UI-405 | Stop the server, then submit valid input | Passed. The form showed "Could not reach the server.", the typed values were kept, and the button could be used again |
+| UI-406 | Select an inspection, open the form, type in it, and cancel | Passed. The right panel showed the inspection that was selected before, the list still had seven rows, and the form was empty when opened again |
+| UI-407 | Delay the create endpoint for a few seconds, and try to submit more than once | Failed at first, then passed after a fix. See DV-1. With a four-second delay, two clicks in the same instant and a third during the request created one inspection. The button, "Cancel" and the fields were disabled during the request. The delay was not committed |
+| Regression | Repeat the TS-003 UI checks on an inspection created from the page | Passed. The inspection was assigned, started and completed from the page. The row showed each new status, and a completed inspection showed no control. The 409 path (UI-305) was not repeated |
+
+The date field was filled by script with a `YYYY-MM-DD` value, not through the browser's date picker.
 
 Why this is acceptable: the page holds no rules. A wrong value is caught by the server, whose tests exist. What can break here is wiring, and each wire is exercised once by the checks above.
 
@@ -148,6 +150,15 @@ Owner of every item: the author.
 | D-4 | Whole-row click and a "View" button | A link on the registration only, as before | The reviewer did not find the link. The button is also what a keyboard user operates, since a table row cannot take focus by default |
 | D-5 | No client-side validation | `required` attributes and a `min` on the date | See section 8. One set of rules, on the server |
 
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | The form checks a ref, `inFlight`, before it submits, in addition to the `submitting` state in section 5 | The check for UI-407 failed on the first build: two clicks in the same instant created two inspections. `submitting` disables the button only after the next render, so both clicks passed it. A ref changes at once |
+| DV-2 | The "New inspection" button is in the page header, next to the title, not inside the left panel | It does not move when the list changes length or is replaced by a message. It can be used only once the list has loaded: it is disabled while the list is loading, after the list has failed to load, and while the form is open. If the list cannot be loaded the server is not answering, and a form that could not be submitted would help nobody |
+| DV-4 | Changes after a review of this pull request. An error for a field the form does not have is now shown as the form-level message even when it arrives together with errors for known fields. The form resets its sending state after a success too | The first was lost in the mixed case, against section 8. The second made the form depend on its parent removing it. The review also found that DV-2 first claimed the button could be used when the list had failed, which the code never did. The sentence was wrong, not the code, and it is corrected above |
+| DV-3 | The registration in a row is plain text. The earlier button on it was removed | The whole row and the "View" button now select. Two buttons in one row for the same action would be read twice by a screen reader |
+
 ### Verified against the code
 
 Checked on `dev` before this spec was written.
@@ -158,7 +169,7 @@ Checked on `dev` before this spec was written.
 | A 422 body has `errors` keyed by field name | TS-001 section 6, and the AC-106 test |
 | The list is newest first, so its first item is the newest inspection | `InspectionController::index`, and the AC-201 test |
 | Only the registration text in a row can be clicked today | `resources/js/components/InspectionList.tsx` |
-| `<input type="date">` gives `YYYY-MM-DD`, the format the server requires | HTML specification. To be confirmed in the browser as part of UI-402 |
+| `<input type="date">` gives `YYYY-MM-DD`, the format the server requires | HTML specification. The server accepted the value the field held (UI-402). The date picker itself was not used in the check |
 
 ### Open questions
 

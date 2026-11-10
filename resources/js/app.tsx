@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { assignInspector, completeInspection, listInspections, startInspection } from './api';
+import { CreateInspectionForm } from './components/CreateInspectionForm';
 import { InspectionDetail } from './components/InspectionDetail';
 import { InspectionList } from './components/InspectionList';
 import type { Inspection } from './types';
@@ -12,6 +13,7 @@ function App() {
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [load, setLoad] = useState<LoadState>('loading');
     const [loadError, setLoadError] = useState('');
+    const [creating, setCreating] = useState(false);
     const [pendingAction, setPendingAction] = useState(false);
     const [actionError, setActionError] = useState<{ id: number; message: string } | null>(null);
 
@@ -22,6 +24,9 @@ function App() {
             .then((loaded) => {
                 if (cancelled) return;
                 setInspections(loaded);
+                // The list is newest first. Selecting it puts a detail and a
+                // next-step control on screen without a click.
+                setSelectedId(loaded[0]?.id ?? null);
                 setLoad('ready');
             })
             .catch((error: unknown) => {
@@ -40,6 +45,12 @@ function App() {
     function select(id: number) {
         setSelectedId(id);
         setActionError(null);
+        setCreating(false);
+    }
+
+    function addCreated(inspection: Inspection) {
+        setInspections((current) => [inspection, ...current]);
+        select(inspection.id);
     }
 
     async function run(id: number, action: () => Promise<Inspection>) {
@@ -72,7 +83,17 @@ function App() {
 
     return (
         <main className="mx-auto max-w-5xl p-6">
-            <h1 className="text-2xl font-semibold">Inspections</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-semibold">Inspections</h1>
+                <button
+                    type="button"
+                    onClick={() => setCreating(true)}
+                    disabled={load !== 'ready' || creating}
+                    className="cursor-pointer rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                >
+                    New inspection
+                </button>
+            </div>
             <div className="mt-6 grid gap-6 md:grid-cols-2">
                 <section className="rounded-lg border border-gray-200 bg-white">
                     {load === 'loading' && (
@@ -95,7 +116,12 @@ function App() {
                     )}
                 </section>
                 <section className="rounded-lg border border-gray-200 bg-white p-4">
-                    {selected ? (
+                    {creating ? (
+                        <CreateInspectionForm
+                            onCreated={addCreated}
+                            onCancel={() => setCreating(false)}
+                        />
+                    ) : selected ? (
                         <InspectionDetail
                             inspection={selected}
                             pendingAction={pendingAction}
@@ -112,7 +138,7 @@ function App() {
                         />
                     ) : (
                         <p className="text-sm text-gray-500">
-                            Select an inspection to see its details.
+                            No inspection selected. Create one with New inspection.
                         </p>
                     )}
                 </section>
