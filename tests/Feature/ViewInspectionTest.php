@@ -72,6 +72,10 @@ class ViewInspectionTest extends TestCase
                 'notes' => 'Customer prefers a morning visit.',
                 'status' => 'pending',
                 'inspector_name' => null,
+                'next_action' => 'assign',
+                'assigned_at' => null,
+                'started_at' => null,
+                'completed_at' => null,
                 'created_at' => '2026-11-10T09:00:00Z',
                 'updated_at' => '2026-11-10T09:00:00Z',
             ],
@@ -156,10 +160,14 @@ class ViewInspectionTest extends TestCase
         $this->assertNotSame('Inspection not found.', $response->json('message'));
     }
 
-    public function test_the_seeder_creates_sample_inspections(): void
+    public function test_the_seeder_creates_sample_inspections_in_every_status(): void
     {
         $this->seed();
 
-        $this->assertDatabaseCount('inspections', 5);
+        $this->assertSame(
+            ['assigned' => 2, 'completed' => 1, 'in_progress' => 1, 'pending' => 3],
+            Inspection::query()->toBase()->selectRaw('status, count(*) as total')
+                ->groupBy('status')->orderBy('status')->pluck('total', 'status')->all(),
+        );
     }
 }
