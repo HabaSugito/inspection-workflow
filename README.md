@@ -45,11 +45,14 @@ specs/
 │   ├── ds-002.md
 │   ├── ts-002-view-inspections-api.md     the two read endpoints
 │   └── ts-002-view-inspections-ui.md      the list and the detail panel
-└── SPEC-0003/                             Progress an inspection
-    ├── ds-003.md
-    ├── ts-003-inspection-workflow.md      the three actions and their rules
-    ├── ts-003-step-times.md               the time of each step
-    └── ts-003-inspection-workflow-ui.md   the control for the next action
+├── SPEC-0003/                             Progress an inspection
+│   ├── ds-003.md
+│   ├── ts-003-inspection-workflow.md      the three actions and their rules
+│   ├── ts-003-step-times.md               the time of each step
+│   └── ts-003-inspection-workflow-ui.md   the control for the next action
+└── SPEC-0004/                             Create and select inspections in the UI
+    ├── ds-004.md
+    └── ts-004-create-and-select-ui.md     the form, and a list that is easy to open
 ```
 
 | File | Holds | Rule |
@@ -109,6 +112,18 @@ php artisan serve
 ```
 
 Open http://localhost:8000. The sample data has inspections in every status.
+
+### Using the page
+
+The page has two panels. The list is on the left, and the right panel shows one inspection.
+
+| To | Do this |
+|---|---|
+| See an inspection | The newest one is shown when the page loads. Click any row, or its "View" button, to see another |
+| Create an inspection | Choose "New inspection", fill in the form in the right panel, and choose "Create inspection". If the input is refused, the reason is shown under the field |
+| Move an inspection forward | Use the button at the bottom of the right panel. It is "Assign inspector" (with a name), then "Start inspection", then "Complete inspection". Only the next valid step is offered |
+
+The form and the "View" buttons were added after a reviewer's feedback on the first submission. See [After the first submission](#after-the-first-submission).
 
 ### With Docker
 
@@ -196,6 +211,20 @@ curl -X POST http://localhost:8000/api/inspections/8/start
 }
 ```
 
+## After the first submission
+
+A reviewer ran the first submission and reported that the page showed only a list: no form to add an inspection, no way to start one, and no way to send the details to the customer. The feedback was fair on two of the three points.
+
+| What the reviewer expected | What the first submission did | What changed |
+|---|---|---|
+| To see more than a list, and to start an inspection | Both existed, but the detail panel opened only when the registration text in a row was clicked, and nothing on the page said so. The brief asks for "a simple way" to do this. A way the reviewer did not find was not simple. This was a defect | The newest inspection is selected when the page loads. The whole row can be clicked, and each row has a "View" button |
+| A form to add an inspection | Creating was possible through the API only. The brief lists creating under "Laravel API", so the form was left out of the first design spec. The README did not say plainly that the page had no form | The page has a form. It calls the same endpoint |
+| To send the inspection details to the customer | Not built | Not built. The brief puts notifications out of scope. See below |
+
+The change went through the same steps as the rest: a design spec and a technical spec first (`specs/SPEC-0004/`), then the code. It needed no change to the API or the database.
+
+**Sending details to the customer, in production.** It would not be done inside the request that changes the status. The workflow service would record an event when a step succeeds, after the update is committed. A queued job would send the message, so a slow or failing mail provider cannot fail the step, and the job can be retried. That needs a customer contact field, which the brief's four fields do not include, and a record of what was sent.
+
 ## Key decisions
 
 Each technical spec records its decisions in section 11, with the alternative that was considered. These are the ones that shape the code most.
@@ -208,6 +237,7 @@ Each technical spec records its decisions in section 11, with the alternative th
 | 409 for an action the status does not allow, 422 for input that is wrong in itself | A client can tell "fix your request" from "the inspection has moved on" |
 | The API returns `next_action` | The UI shows the control for that action and holds no workflow rules of its own |
 | No state-machine package | Three transitions do not justify a dependency |
+| The page does not check the form before sending it. It shows the server's messages under each field | One set of rules, on the server. A rule copied into the page can drift from the real one |
 | The inspector is stored as a name | The brief allows a name or an ID. A table of inspectors would add screens and endpoints that nothing asks for |
 | API and UI in one Laravel project | One install and one command to run, with no CORS setup |
 | Specs before code (spec-driven development) | Decisions are made and reviewed in a short document before they are made in code, where they cost more to change. See [How it was built](#how-it-was-built-spec-driven-development) |
@@ -217,6 +247,7 @@ Each technical spec records its decisions in section 11, with the alternative th
 The brief builds on an earlier system-design exercise. I did not take part in one, so the design specs under `specs/` stand in for it.
 
 - There is no authentication, as the brief says. Any caller can create an inspection and perform any step.
+- The page is used by an operations user, who enters the customer's request. The customer does not use it.
 - A vehicle registration is free text of up to 20 characters. It is stored in upper case. No country's format is enforced.
 - A requested date must be today or later, by the server's date in UTC.
 - Sending the same create request twice creates two inspections.
