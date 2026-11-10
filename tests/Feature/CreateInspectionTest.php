@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Inspection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -362,5 +363,26 @@ class CreateInspectionTest extends TestCase
         $this->postJson('/api/inspections', $this->validPayload(['requested_date' => '2026-11-09']))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['requested_date']);
+    }
+
+    public function test_ac109_the_model_upper_cases_the_registration_for_any_writer(): void
+    {
+        $inspection = Inspection::factory()->create(['vehicle_registration' => 'ab12 cde']);
+
+        $this->assertSame('AB12 CDE', DB::table('inspections')->where('id', $inspection->id)->value('vehicle_registration'));
+    }
+
+    public function test_ac107_the_model_does_not_accept_status_or_inspector_by_mass_assignment(): void
+    {
+        $inspection = Inspection::create($this->validPayload([
+            'status' => 'completed',
+            'inspector_name' => 'Sam Inspector',
+        ]));
+
+        $this->assertDatabaseHas('inspections', [
+            'id' => $inspection->id,
+            'status' => 'pending',
+            'inspector_name' => null,
+        ]);
     }
 }
