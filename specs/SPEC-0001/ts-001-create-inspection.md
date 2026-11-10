@@ -140,7 +140,7 @@ Each test is written before the code it covers, run, and seen to fail for the re
 | AC-101 | A valid request returns 201, the resource has status `pending` and a null inspector, and the row exists |
 | AC-102 | A request without `notes` returns 201 with null notes |
 | AC-103 | Data provider over the three required fields: each missing field returns 422 with an error under that key |
-| AC-104 | Data provider over invalid dates (`not-a-date`, `2026-02-30`, `01/12/2026`): each returns 422 with an error under `requested_date` |
+| AC-104 | Data provider over invalid dates (`not-a-date`, `2027-02-30`, `01/12/2026`): each returns 422 with an error under `requested_date` |
 | AC-105 | Data provider over each field at one character above its limit: each returns 422. A value exactly at the limit is accepted |
 | AC-106 | A 422 body has `message` and `errors`, and the table is still empty. One case sends the request without a JSON `Accept` header and still gets JSON |
 | AC-107 | A request carrying `status: completed` and `inspector_name` returns 201 with status `pending` and a null inspector, and the row matches |
@@ -173,6 +173,12 @@ Checked in the scaffolded project (Laravel 13.40) before implementation.
 | A resource for a newly created model answers 201 | `ResourceResponse` |
 | The application timezone is UTC | `config/app.php` |
 | Tests run against in-memory SQLite | `phpunit.xml` |
+
+### Deviations from this spec
+
+| ID | Deviation | Reason |
+|---|---|---|
+| DV-1 | The AC-104 test uses `2027-02-30` where this spec first said `2026-02-30` | With the clock fixed at 2026-11-10, `2026-02-30` is also in the past, so the test could pass through the past-date rule (AC-108) without proving that an impossible date is rejected |
 
 ### Open questions
 
