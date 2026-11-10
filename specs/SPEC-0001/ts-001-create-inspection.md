@@ -161,8 +161,10 @@ Added after a review of the test coverage (see DV-2 and DV-3):
 | AC-105 | A registration of 20 "ß" is rejected, because it is 40 characters in upper case. One of 10 "ß" is accepted and stored as 20 characters |
 | AC-107 | An `id`, `created_at` or `updated_at` in the request is ignored |
 | AC-108 | Today is accepted at 23:59:59, and yesterday is rejected at 00:00:00 |
+| AC-109 | The model upper-cases a registration written without going through the API. The form request now upper-cases too, so the API tests alone no longer prove the model's rule |
+| AC-107 | The model itself refuses `status` and `inspector_name` by mass assignment. The controller passes only validated fields, so the API test alone does not prove the model's rule |
 
-Not tested: `InspectionFactory`. No test in this spec uses it (see DF-3). Everything else in this spec is covered.
+`InspectionFactory` is now used by the AC-109 test above, which closes DF-3 within this spec.
 
 ## 11. Decisions, open questions, deferred items & risks
 
