@@ -2,6 +2,13 @@ export type InspectionStatus = 'pending' | 'assigned' | 'in_progress' | 'complet
 
 export type NextAction = 'assign' | 'start' | 'complete';
 
+export interface NewInspection {
+    customer_name: string;
+    vehicle_registration: string;
+    requested_date: string;
+    notes: string;
+}
+
 export interface Inspection {
     id: number;
     customer_name: string;

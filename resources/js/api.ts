@@ -1,12 +1,16 @@
-import type { Inspection } from './types';
+import type { Inspection, NewInspection } from './types';
+
+export type FieldErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
     readonly status: number;
+    readonly fieldErrors: FieldErrors;
 
-    constructor(status: number, message: string) {
+    constructor(status: number, message: string, fieldErrors: FieldErrors = {}) {
         super(message);
         this.name = 'ApiError';
         this.status = status;
+        this.fieldErrors = fieldErrors;
     }
 }
 
@@ -28,6 +32,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         throw new ApiError(
             response.status,
             messageFrom(body) ?? `Request failed (${response.status}).`,
+            fieldErrorsFrom(body),
         );
     }
 
@@ -58,6 +63,28 @@ function messageFrom(body: unknown): string | null {
     return null;
 }
 
+function fieldErrorsFrom(body: unknown): FieldErrors {
+    if (
+        typeof body !== 'object' ||
+        body === null ||
+        !('errors' in body) ||
+        typeof body.errors !== 'object' ||
+        body.errors === null
+    ) {
+        return {};
+    }
+
+    const fieldErrors: FieldErrors = {};
+
+    for (const [field, messages] of Object.entries(body.errors)) {
+        if (Array.isArray(messages)) {
+            fieldErrors[field] = messages.filter((message) => typeof message === 'string');
+        }
+    }
+
+    return fieldErrors;
+}
+
 async function post(path: string, payload?: object): Promise<Inspection> {
     const body = await request<{ data: Inspection }>(path, {
         method: 'POST',
@@ -72,6 +99,10 @@ export async function listInspections(): Promise<Inspection[]> {
     const body = await request<{ data: Inspection[] }>('/api/inspections');
 
     return body.data;
+}
+
+export function createInspection(input: NewInspection): Promise<Inspection> {
+    return post('/api/inspections', input);
 }
 
 export function assignInspector(id: number, inspectorName: string): Promise<Inspection> {
