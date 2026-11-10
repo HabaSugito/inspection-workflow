@@ -15,6 +15,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        Inspection::factory()->count(5)->create();
+        Inspection::factory()->completed()->create();
+        Inspection::factory()->inProgress()->create();
+        Inspection::factory()->assigned()->count(2)->create();
+        Inspection::factory()->count(3)->create();
     }
 }

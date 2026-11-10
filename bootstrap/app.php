@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\InvalidTransition;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -28,4 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json(['message' => 'Inspection not found.'], 404);
             }
         });
+
+        // A refused step is an expected outcome, not an error to log.
+        $exceptions->dontReport(InvalidTransition::class);
+        $exceptions->render(fn (InvalidTransition $e) => response()->json([
+            'message' => $e->getMessage(),
+            'current_status' => $e->currentStatus->value,
+            'allowed_action' => $e->allowedAction,
+        ], 409));
     })->create();
