@@ -48,15 +48,20 @@ export function CreateInspectionForm({ onCreated, onCancel }: Props) {
             onCreated(await createInspection(values));
         } catch (error: unknown) {
             const errors = error instanceof ApiError ? error.fieldErrors : {};
-            const known = fields.some((field) => field.name in errors);
+            const unknown = Object.entries(errors)
+                .filter(([name]) => !fields.some((field) => field.name === name))
+                .flatMap(([, messages]) => messages);
 
             setFieldErrors(errors);
 
             // An error that belongs to no field on this form must still be seen.
-            if (!known) {
+            if (unknown.length > 0) {
+                setFormError(unknown.join(' '));
+            } else if (Object.keys(errors).length === 0) {
                 setFormError(error instanceof Error ? error.message : 'Unknown error.');
             }
-
+        } finally {
+            // Also after a success, so the form works again if its parent keeps it open.
             setSubmitting(false);
             inFlight.current = false;
         }
